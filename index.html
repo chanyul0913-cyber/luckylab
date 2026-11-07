@@ -141,6 +141,20 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </ul>
     <p>각 전략이 번호를 어떻게 고르는지는 '번호 뽑기' 아래 <b>'전략 설명'</b>을 눌러 보세요. 모든 전략은 사람들이 많이 고르는 조합(생일 숫자만, 연속 숫자 등)을 피해서, 당첨되면 나눠 가질 사람이 적도록 합니다.</p>
 
+    <h3>🔮 내 사주 맞춤 배분</h3>
+    <p>사주를 저장한 뒤 '전체 전략'에서 <b>'🔮 내 사주 맞춤 배분'</b>을 고르거나, 사주 결과 아래 <b>[내 사주 맞춤 번호 받기]</b>를 누르면, 내 사주에서 <b>채워야 할 오행</b>에 어울리는 전략으로 게임 수만큼 자동 배분합니다.</p>
+    <ul>
+      <li>첫 게임은 항상 <b>사주 오행형</b>입니다.</li>
+      <li>나머지 게임은 오행 가중치(부족할수록, 추첨일 일진과 같을수록 큼) 비율대로 나눕니다.</li>
+      <li><b>목</b>(성장·새 흐름) → 최근 50회 참고형, 딥러닝 LSTM형</li>
+      <li><b>화</b>(변화·폭발력) → 양자 확률진폭형, 무작위 혼합형</li>
+      <li><b>토</b>(안정·중심) → 전체 통계 균형형, 구간 분산형</li>
+      <li><b>금</b>(규칙·결단) → 마르코프 전이형, 만세력형</li>
+      <li><b>수</b>(흐름·때를 기다림) → 미출현 포함형, 별자리형, 점성술형</li>
+      <li>같은 사람·같은 회차면 항상 같은 배분이 나옵니다. 배분된 전략은 게임별로 직접 바꿀 수도 있습니다.</li>
+      <li>오행과 전략의 짝은 이 사이트가 의미를 연결해 정한 것으로, 전통 명리학의 정해진 규칙은 아닙니다. 확률상 더 유리한 전략도 아닙니다.</li>
+    </ul>
+
     <h3>내 정보 입력 (사주·별자리·점성술용)</h3>
     <ul>
       <li>'(내 정보 필요)'가 붙은 전략을 쓰려면 <b>'내 정보 입력'</b>에 생년월일(양력/음력)과 태어난 시간을 넣고 <b>[사주 저장]</b>을 누르세요. 시간을 모르면 '모름'으로 두면 됩니다.</li>
@@ -169,6 +183,7 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       <label class="inl">게임 수 <select id="gameCount"></select></label>
       <label class="inl">전체 전략 <select id="allStrat"></select></label>
     </div>
+    <p class="note" id="planNote" style="margin:0 0 6px"></p>
     <div id="sets"></div>
     <div class="row" style="margin-top:8px">
       <button class="primary" id="again">번호 뽑기</button>
@@ -409,7 +424,10 @@ function renderSaju() {
       부족한 오행일수록, 그리고 일진의 오행(${GAN_OH[s.draw.gan]}·${JI_OH[s.draw.ji]})일수록 가중치를 높였습니다.
       가장 힘을 주는 오행은 <b class="o-${best}">${best}</b>, 끝자리 ${ohDigits(best)}인 번호입니다.</p>
     <p class="note">오행 가중치: ${OHS.map(o => `${o} ${s.ohW[o]} (끝자리 ${ohDigits(o)})`).join(" · ")}</p>
-    ${renderWest(s.west)}`;
+    ${renderWest(s.west)}
+    <div class="row" style="margin-top:12px"><button class="primary" type="button" id="sajuGo">🔮 내 사주 맞춤 번호 받기</button></div>`;
+  if ($("allStrat").value === "__saju") applySajuPlan(); // 사주를 바꾸면 배분도 다시
+  $("sajuGo").onclick = () => { if (applySajuPlan()) { generate(); $("planNote").scrollIntoView({ behavior: "smooth", block: "start" }); } };
 }
 
 // ---------- 별자리·점성술 ----------
@@ -544,7 +562,34 @@ const optHtml = sel => GROUPS.map(([g, ks]) => `<optgroup label="${g}">`
 $("stratHelp").innerHTML = GROUPS.map(([g, ks]) => `<b style="color:var(--accent)">${g}</b><br>` + ks.map(k => `<b>${optLabel(k)}</b> — ${STRATS[k][1]}`).join("<br>")).join("<br><br>") + "<br>"
   + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.";
 $("gameCount").innerHTML = Array.from({ length: 10 }, (_, i) => `<option${i === 4 ? " selected" : ""}>${i + 1}</option>`).join("");
-$("allStrat").innerHTML = `<option value="">게임별로 고르기</option>` + optHtml("");
+$("allStrat").innerHTML = `<option value="">게임별로 고르기</option><option value="__saju">🔮 내 사주 맞춤 배분</option>` + optHtml("");
+
+// ---------- 사주 맞춤 배분 ----------
+// 채워야 할 오행(가중치가 큰 오행)에 어울리는 전략으로 게임을 나눔. 명리 해석상 '어울림'이며 확률 차이는 없음
+const OH_STRATS = { 목: ["recent", "deep"], 화: ["quantum", "random"], 토: ["balance", "spread"], 금: ["markov", "manse"], 수: ["overdue", "zodiac", "astro"] };
+const OH_MEAN = { 목: "성장·새 흐름", 화: "변화·폭발력", 토: "안정·중심", 금: "규칙·결단", 수: "흐름·때를 기다림" };
+function sajuPlan(n) {
+  const order = OHS.slice().sort((a, b) => saju.ohW[b] - saju.ohW[a] || OHS.indexOf(a) - OHS.indexOf(b));
+  const rest = n - 1, tot = order.reduce((a, o) => a + saju.ohW[o], 0);
+  // 최대 잔여법: 가중치 비율대로 나누고 남는 게임은 소수점이 큰 오행부터
+  const share = order.map(o => ({ o, x: rest * saju.ohW[o] / tot })), cnt = {};
+  share.forEach(v => cnt[v.o] = Math.floor(v.x));
+  let left = rest - Object.values(cnt).reduce((a, b) => a + b, 0);
+  share.slice().sort((a, b) => (b.x % 1) - (a.x % 1) || order.indexOf(a.o) - order.indexOf(b.o)).forEach(v => { if (left > 0) { cnt[v.o]++; left--; } });
+  const plan = ["saju"], why = [];
+  order.forEach(o => { for (let j = 0; j < cnt[o]; j++) plan.push(OH_STRATS[o][j % OH_STRATS[o].length]);
+    if (cnt[o]) why.push(`<b class="o-${o}">${o}</b>(${OH_MEAN[o]}, 가중치 ${saju.ohW[o]}) ${cnt[o]}게임`); });
+  console.assert(plan.length === n, "배분 개수 오류");
+  return { plan: plan.slice(0, n), why };
+}
+function applySajuPlan() {
+  if (!saju) { $("planNote").innerHTML = `<span class="warn" style="display:block">사주 맞춤 배분은 아래 '내 정보 입력'에 사주를 먼저 저장해야 합니다.</span>`; $("allStrat").value = ""; $("sjY").focus(); return false; }
+  const { plan, why } = sajuPlan(+$("gameCount").value);
+  choice = plan; renderRows(); $("allStrat").value = "__saju";
+  $("planNote").innerHTML = `🔮 ${saju.name ? esc(saju.name) + "님" : "내"} 사주에서 채워야 할 기운 순서대로 나눴습니다: 사주 오행형 1게임`
+    + (why.length ? " · " + why.join(" · ") : "") + `. 명리 해석상 어울리는 전략일 뿐, 1등 확률은 모든 전략이 같습니다.`;
+  return true;
+}
 
 let choice = SKEYS.slice(0, 5), current = [];
 function renderRows() {
@@ -555,10 +600,14 @@ function renderRows() {
   $("sets").innerHTML = choice.map((k, i) => `<div class="set"><span class="idx">${i + 1}게임</span>
     <select data-i="${i}" aria-label="${i + 1}게임 전략">${optHtml(k)}</select>
     <div class="balls" id="res${i}" style="grid-column:2"></div><div class="why" id="why${i}"></div></div>`).join("");
-  $("sets").querySelectorAll("select").forEach(el => el.onchange = () => { choice[+el.dataset.i] = el.value; $("allStrat").value = ""; });
+  $("sets").querySelectorAll("select").forEach(el => el.onchange = () => { choice[+el.dataset.i] = el.value; $("allStrat").value = ""; $("planNote").innerHTML = ""; });
 }
-$("gameCount").onchange = renderRows;
-$("allStrat").onchange = () => { if ($("allStrat").value) { choice = choice.map(() => $("allStrat").value); renderRows(); $("allStrat").value = choice[0]; } };
+$("gameCount").onchange = () => { if ($("allStrat").value === "__saju") applySajuPlan(); else renderRows(); };
+$("allStrat").onchange = () => {
+  const v = $("allStrat").value; $("planNote").innerHTML = "";
+  if (v === "__saju") applySajuPlan();
+  else if (v) { choice = choice.map(() => v); renderRows(); $("allStrat").value = v; }
+};
 renderRows();
 
 function generate() {

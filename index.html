@@ -79,6 +79,43 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 .guide li{margin:3px 0}
 .guide dt{font-weight:700;font-size:14px;margin-top:10px}
 .guide dd{margin:2px 0 0}
+.quick h2{margin-bottom:10px}
+.qbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.qbtns{grid-template-columns:1fr}}
+button.big{font-size:17px;padding:16px 12px;border-radius:12px}
+button.alt{background:#2f6fb0;border-color:#2f6fb0;color:#fff}
+.linkish{border:0;background:none;color:var(--ink2);padding:10px 0 0;font-size:14px;text-decoration:underline}
+.cq{border:2px solid var(--accent);border-radius:12px;padding:12px;margin:8px 0}
+.cq .balls{margin:6px 0}
+.cq .ball{width:30px;height:30px;font-size:13px}
+.flash{animation:flash 1.2s ease 2}
+@keyframes flash{50%{box-shadow:0 0 0 4px var(--accent)}}
+dialog#pics{width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 24px);border:1px solid var(--line);border-radius:16px;padding:0;background:var(--card);color:var(--ink)}
+dialog#pics::backdrop{background:rgba(0,0,0,.55)}
+.picsTop{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.picsTop button{border:0;padding:4px 8px;font-size:18px}
+.slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.slides::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:start;padding:16px;text-align:center}
+.step{font-weight:700;color:var(--accent);margin:0 0 10px}
+.phone{border:2px solid var(--line);border-radius:18px;padding:14px;margin:0 auto;max-width:290px;display:flex;flex-direction:column;gap:8px;align-items:center;background:var(--bg)}
+.mk{font-weight:700;font-size:14px}
+.mk .x{color:#d9453b;font-size:18px;margin-left:4px}
+.balls.sm .ball{width:28px;height:28px;font-size:12px}
+.fakebtn{position:relative;background:var(--accent);color:#1a1300;font-weight:700;border-radius:10px;padding:10px 14px;width:100%;font-size:14px}
+.fakebtn.alt{background:#2f6fb0;color:#fff}
+.fakebtn.small{width:auto;padding:6px 14px}
+.fakesel{position:relative;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:14px}
+.phone .chips{justify-content:center;margin:0}
+.phone .chip{position:relative;border:1px solid var(--line);font-size:13px}
+.hl{outline:3px solid #e5322d;outline-offset:2px}
+.no{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;background:#e5322d;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.arrow{font-size:20px;color:var(--muted);line-height:1}
+.cap{font-size:16px;line-height:1.6;margin:14px 0 0}
+.picsNav{display:flex;justify-content:space-between;align-items:center;padding:10px 16px 14px;border-top:1px solid var(--line)}
+#picsDots{display:flex;gap:6px}
+#picsDots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+#picsDots i.on{background:var(--accent)}
 .warn{margin:8px 0 0;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--warn);border:1px solid var(--warn)}
 .sajuGrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px}
 @media (max-width:640px){.sajuGrid{grid-template-columns:1fr}}
@@ -111,6 +148,15 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
   <h1>로또 6/45 분석소</h1>
   <p class="sub" id="meta">데이터 불러오는 중…</p>
 
+  <section class="card quick">
+    <h2>무엇을 할까요?</h2>
+    <div class="qbtns">
+      <button class="primary big" id="qRandom">🎲 바로 번호 받기</button>
+      <button class="primary big alt" id="qCeleb">⭐ 유명인 사주로 받기</button>
+    </div>
+    <button class="linkish" id="qPics">👆 처음이면 <b>그림으로 사용법 보기</b></button>
+  </section>
+
   <details class="card guide" id="guide">
     <summary>📖 처음이신가요? <b>사용 설명서</b> 보기</summary>
     <h3>이 사이트는</h3>
@@ -124,6 +170,8 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     </ul>
 
     <h3>번호 뽑는 방법</h3>
+    <p><b>가장 쉬운 방법:</b> 맨 위 <b>[🎲 바로 번호 받기]</b>를 누르거나, <b>[⭐ 유명인 사주로 받기]</b> → 이름 누르기 → <b>[받기]</b>. 그림 설명은 맨 위 <b>'그림으로 사용법 보기'</b>를 누르세요.</p>
+    <p>직접 고르려면:</p>
     <ol>
       <li><b>게임 수</b>를 고릅니다 (1~10게임).</li>
       <li>게임마다 <b>전략</b>을 고릅니다. 모든 게임을 같은 전략으로 하려면 <b>'전체 전략'</b>에서 고르세요.</li>
@@ -159,7 +207,7 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     <h3>내 정보 입력 (사주·별자리·점성술용)</h3>
     <ul>
       <li>'(내 정보 필요)'가 붙은 전략을 쓰려면 <b>'내 정보 입력'</b>에 생년월일(양력/음력)과 태어난 시간을 넣고 <b>[사주 저장]</b>을 누르세요. 시간을 모르면 '모름'으로 두면 됩니다.</li>
-      <li>오른쪽 <b>유명인 사주</b>를 누르면 그 사람 생년월일이 자동으로 들어갑니다.</li>
+      <li>오른쪽 <b>유명인 사주</b>에서 이름을 누르면 그 사람 생년월일이 자동으로 들어가고, 바로 아래에 나오는 <b>[받기]</b>를 누르면 그 사주에 맞춘 번호가 한 번에 나옵니다.</li>
       <li>가족·친구 사주는 이름을 넣고 <b>'목록에 추가'</b>해 두면 다음에 눌러서 불러올 수 있습니다.</li>
       <li>입력한 정보는 <b>이 휴대폰(브라우저)에만 저장</b>되고 어디에도 전송되지 않습니다.</li>
     </ul>
@@ -219,6 +267,7 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
       <h3>유명인 사주</h3>
       <p class="note">누르면 자동으로 입력됩니다. 공개된 생년월일 기준이며 태어난 시간은 '모름'(시주 제외)입니다.</p>
       <div class="chips" id="celebs"></div>
+      <div id="celebQuick" class="cq" hidden></div>
       <h3>내 목록</h3>
       <p class="note">왼쪽에 입력한 사주를 이름으로 저장해 두고 눌러서 불러옵니다.</p>
       <div class="chips" id="myList"></div>
@@ -267,6 +316,66 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
   </section>
 </main>
 <div id="tip"></div>
+<dialog id="pics" aria-label="그림으로 보는 사용법">
+  <div class="picsTop"><b>그림으로 보는 사용법</b><button id="picsClose" aria-label="닫기">✕</button></div>
+  <div class="slides" id="slides">
+    <div class="slide">
+      <p class="step">먼저 꼭 보세요</p>
+      <div class="phone">
+        <div class="mk">지난 회차 실제 당첨번호 <span class="x">✕</span></div>
+        <div class="balls sm"><span class="ball b2">16</span><span class="ball b2">18</span><span class="ball b3">27</span><span class="ball b4">36</span><span class="ball b4">38</span><span class="ball b5">42</span></div>
+      </div>
+      <p class="cap">맨 위 번호는 <b>지난주 결과</b>예요.<br><b>이 번호로 사지 마세요!</b></p>
+    </div>
+    <div class="slide">
+      <p class="step">방법 고르기</p>
+      <div class="phone">
+        <div class="mk">무엇을 할까요?</div>
+        <div class="fakebtn">🎲 바로 번호 받기 <span class="no">A</span></div>
+        <div class="fakebtn alt">⭐ 유명인 사주로 받기 <span class="no">B</span></div>
+      </div>
+      <p class="cap"><b>A</b> 그냥 번호만 받기<br><b>B</b> 유명인 사주로 받기</p>
+    </div>
+    <div class="slide">
+      <p class="step">A. 바로 번호 받기</p>
+      <div class="phone">
+        <div class="fakebtn hl">🎲 바로 번호 받기 <span class="no">1</span></div>
+        <div class="arrow">⬇</div>
+        <div class="balls sm"><span class="ball b1">3</span><span class="ball b2">17</span><span class="ball b3">24</span><span class="ball b4">33</span><span class="ball b4">38</span><span class="ball b5">44</span></div>
+        <div class="balls sm"><span class="ball b1">8</span><span class="ball b2">12</span><span class="ball b3">29</span><span class="ball b3">30</span><span class="ball b4">35</span><span class="ball b5">41</span></div>
+      </div>
+      <p class="cap">누르면 <b>끝!</b> 번호 5줄이 바로 나와요.</p>
+    </div>
+    <div class="slide">
+      <p class="step">B-1. 유명인 고르기</p>
+      <div class="phone">
+        <div class="fakebtn alt hl">⭐ 유명인 사주로 받기 <span class="no">1</span></div>
+        <div class="arrow">⬇</div>
+        <div class="chips"><span class="chip">정국 (BTS)</span><span class="chip hl">손흥민 <span class="no">2</span></span><span class="chip">아이유</span><span class="chip">유재석</span></div>
+      </div>
+      <p class="cap">버튼을 누르고<br>원하는 <b>사람 이름</b>을 눌러요.</p>
+    </div>
+    <div class="slide">
+      <p class="step">B-2. 받기 누르기</p>
+      <div class="phone">
+        <div class="mk">손흥민 사주로 번호 받기</div>
+        <div class="row"><span class="fakesel">5게임 ▾ <span class="no">3</span></span><span class="fakebtn hl small">받기 <span class="no">4</span></span></div>
+        <div class="arrow">⬇</div>
+        <div class="balls sm"><span class="ball b1">6</span><span class="ball b2">13</span><span class="ball b3">22</span><span class="ball b4">31</span><span class="ball b4">37</span><span class="ball b5">43</span></div>
+      </div>
+      <p class="cap">몇 게임 살지 고르고<br><b>[받기]</b>를 누르면 번호가 나와요.</p>
+    </div>
+    <div class="slide">
+      <p class="step">번호 저장하기</p>
+      <div class="phone">
+        <div class="balls sm"><span class="ball b1">6</span><span class="ball b2">13</span><span class="ball b3">22</span><span class="ball b4">31</span><span class="ball b4">37</span><span class="ball b5">43</span></div>
+        <div class="fakebtn hl small">번호 복사 <span class="no">5</span></div>
+      </div>
+      <p class="cap"><b>[번호 복사]</b>를 누르고<br>카톡이나 메모에 붙여 넣으세요.</p>
+    </div>
+  </div>
+  <div class="picsNav"><button id="picsPrev">◀ 이전</button><span id="picsDots"></span><button id="picsNext" class="primary">다음 ▶</button></div>
+</dialog>
 
 <script src="data.js"></script>
 <script src="dl.js"></script>
@@ -505,6 +614,7 @@ function pick6(R, w) { // 가중치 w로 비복원 6개 (w 없으면 균등)
 }
 // 사람들이 몰리는 조합 회피 + 역대 형태 범위
 function okShape(s) {
+  if (s.length !== 6 || new Set(s).size !== 6) return false;           // 안전장치: 서로 다른 6개
   if (s.filter(x => x >= 32).length < 2) return false;                 // 생일(1~31)만의 조합 회피
   if (s.some((x, i) => i >= 2 && x - s[i - 1] === 1 && s[i - 1] - s[i - 2] === 1)) return false; // 3연속
   const d = s[1] - s[0]; if (s.every((x, i) => !i || x - s[i - 1] === d)) return false;       // 등차수열
@@ -517,8 +627,10 @@ const STRATS = {
   balance: ["전체 통계 균형형", "역대 출현 빈도를 가중치로 사용", R => pick6(R, freq)],
   recent: ["최근 50회 참고형", "최근 50회 출현 횟수 + 1을 가중치로 사용", R => pick6(R, c50.map(v => v + 1))],
   overdue: ["미출현 포함형", `장기 미출현 상위 5개(${overdue.join(", ")}) 중 2개 + 나머지 무작위`, R => {
-    const a = pick6(R).filter(x => !overdue.includes(x)); const o = overdue.slice().sort(() => R() - .5).slice(0, 2);
-    return [...o, ...a.slice(0, 4)].sort((x, y) => x - y); }],
+    const o = overdue.slice().sort(() => R() - .5).slice(0, 2);
+    const pool = NUMS.filter(x => !overdue.includes(x)), a = []; // 나머지 4개는 미출현 상위 5개를 뺀 40개에서
+    while (a.length < 4) a.push(pool.splice(Math.floor(R() * pool.length), 1)[0]);
+    return [...o, ...a].sort((x, y) => x - y); }],
   spread: ["구간 분산형", "1-10·11-20·21-30·31-40·41-45 구간에서 하나씩 + 1개", R => {
     const s = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 45]].map(([a, b]) => a + Math.floor(R() * (b - a + 1)));
     let x; do x = 1 + Math.floor(R() * 45); while (s.includes(x)); return [...s, x].sort((a, b) => a - b); }],
@@ -638,12 +750,13 @@ function generate() {
   if (choice.some(k => PROFILE.includes(k)) && !saju) $("sjY").focus();
 }
 $("again").onclick = generate;
-$("copy").onclick = async () => {
+async function copyNumbers(toast) {
   const txt = `로또 6/45 제${LAST.no + 1}회 분석 조합\n` + current.map((c, i) => `${i + 1}. ${c.s.join(" ")} (${c.name})`).join("\n");
-  try { await navigator.clipboard.writeText(txt); $("toast").textContent = "복사했어요"; }
-  catch { $("toast").textContent = "복사 실패 — 직접 선택해 복사하세요"; }
-  setTimeout(() => $("toast").textContent = "", 2000);
-};
+  try { await navigator.clipboard.writeText(txt); toast.textContent = "복사했어요"; }
+  catch { toast.textContent = "복사 실패 — 직접 선택해 복사하세요"; }
+  setTimeout(() => toast.textContent = "", 2000);
+}
+$("copy").onclick = () => copyNumbers($("toast"));
 
 // 사주 입력 폼
 $("sjH").innerHTML += Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, "0")}시</option>`).join("");
@@ -683,7 +796,47 @@ let myList = [];
 try { myList = JSON.parse(localStorage.getItem("lottoSajuList") || "[]"); } catch {}
 const saveList = () => { try { localStorage.setItem("lottoSajuList", JSON.stringify(myList)); } catch {} };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-function pickPreset(p) { fillForm(p); applyProfile(p, true); markChip(); }
+function pickPreset(p) { fillForm(p); applyProfile(p, true); markChip(); showQuick(p); }
+// 이름을 누른 바로 아래에서 게임 수만 고르고 [받기] → 사주 맞춤 배분 + 번호 뽑기 + 결과 표시
+function showQuick(p) {
+  const q = $("celebQuick");
+  if (!saju) { q.hidden = true; return; }
+  q.hidden = false;
+  q.innerHTML = `<b>${esc(p.name || "이 사람")} 사주로 번호 받기</b>
+    <div class="row" style="margin-top:8px"><select id="cqN" aria-label="게임 수">${Array.from({ length: 10 }, (_, i) =>
+      `<option value="${i + 1}"${i + 1 === +$("gameCount").value ? " selected" : ""}>${i + 1}게임</option>`).join("")}</select>
+    <button class="primary" id="cqGo">받기</button></div><div id="cqOut"></div>`;
+  $("cqGo").onclick = () => {
+    $("gameCount").value = $("cqN").value;
+    if (!applySajuPlan()) return;
+    generate();
+    $("cqOut").innerHTML = current.map((c, i) => `<div class="balls">${c.s.map(ball).join("")}</div><div class="note" style="margin:0 0 4px">${i + 1}게임 · ${c.name}</div>`).join("")
+      + `<button id="cqCopy">번호 복사</button> <span class="toast" id="cqToast"></span>`;
+    $("cqCopy").onclick = () => copyNumbers($("cqToast"));
+  };
+  q.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// 맨 위 빠른 시작 버튼
+$("qRandom").onclick = () => { generate(); $("sets").scrollIntoView({ behavior: "smooth", block: "start" }); };
+$("qCeleb").onclick = () => { const c = $("celebs"); c.scrollIntoView({ behavior: "smooth", block: "center" }); c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash"); };
+
+// 그림 사용법: 옆으로 밀어 넘기는 슬라이드
+const slides = $("slides"), nSlides = slides.children.length;
+$("picsDots").innerHTML = "<i></i>".repeat(nSlides);
+const curSlide = () => Math.round(slides.scrollLeft / slides.clientWidth);
+const goSlide = i => { slides.scrollTo({ left: Math.max(0, Math.min(nSlides - 1, i)) * slides.clientWidth, behavior: "smooth" }); setTimeout(syncDots, 450); };
+function syncDots() {
+  const i = curSlide();
+  [...$("picsDots").children].forEach((d, k) => d.classList.toggle("on", k === i));
+  $("picsPrev").disabled = i === 0;
+  $("picsNext").textContent = i === nSlides - 1 ? "닫기" : "다음 ▶";
+}
+slides.addEventListener("scroll", syncDots);
+$("picsPrev").onclick = () => goSlide(curSlide() - 1);
+$("picsNext").onclick = () => curSlide() === nSlides - 1 ? $("pics").close() : goSlide(curSlide() + 1);
+$("picsClose").onclick = () => $("pics").close();
+$("qPics").onclick = () => { $("pics").showModal(); slides.scrollLeft = 0; syncDots(); };
 function markChip() {
   const cur = readForm();
   document.querySelectorAll(".presets .chip").forEach(el => el.classList.toggle("on", sameP(JSON.parse(el.dataset.p), cur)));

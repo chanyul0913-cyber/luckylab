@@ -450,14 +450,36 @@ const STRATS = {
   zodiac: ["별자리형", "내 태양 별자리 번호(양자리 1 … 물고기자리 12)와 12씩 더한 수, 같은 원소 별자리 번호, 추첨일 별자리 번호에 가중치", R => pick6(R, saju.west.zw)],
   astro: ["점성술형", "번호를 한 자리로 줄인 수(수비학)가 내 별자리 지배행성·태어난 요일 행성·생명수·추첨일 행성의 수와 같으면 가중치", R => pick6(R, saju.west.aw)],
 };
+// 만세력형: 내 정보 없이, 이번 추첨 시각(토 20:35)의 사주 8글자로 번호를 정함 → 그 주에는 누구에게나 같은 번호
+let manseCache;
+function manse() {
+  if (manseCache !== undefined) return manseCache;
+  if (!window.Solar) return null; // 라이브러리 로딩 실패 시 다음에 다시 시도
+  // 서울 경도 보정 30분: 20:35 → 20:05 (술시)
+  const t = new Date(drawDate.getFullYear(), drawDate.getMonth(), drawDate.getDate(), 20, 5);
+  const ec = Solar.fromDate(t).getLunar().getEightChar();
+  const pil = [ec.getYear(), ec.getMonth(), ec.getDay(), ec.getTime()].map((s, i) => ({ name: ["년", "월", "일", "시"][i], gan: GAN.indexOf(s[0]), ji: JI.indexOf(s[1]), hanja: s }));
+  const cnt = Object.fromEntries(OHS.map(o => [o, 0]));
+  pil.forEach(x => { cnt[GAN_OH[x.gan]]++; cnt[JI_OH[x.ji]]++; });
+  // 60갑자 순번(갑자 1 … 계해 60). 45를 넘으면 45를 뺌
+  const gz = x => { for (let i = 0; i < 60; i++) if (i % 10 === x.gan && i % 12 === x.ji) return i + 1; };
+  const key = pil.map(x => x.hanja).join("");
+  const nums = [...new Set(pil.map(x => { const v = gz(x); return v > 45 ? v - 45 : v; }))];
+  const w = Array(46).fill(0); NUMS.forEach(n => w[n] = 1 + cnt[numOh(n)] + (nums.includes(n) ? 3 : 0)); // 강한 기운을 따름
+  return manseCache = { pil, cnt, nums, w, key };
+}
+STRATS.manse = ["만세력형", "내 정보 없이, 이번 추첨 시각(토 20:35)의 년·월·일·시 4기둥을 만세력으로 뽑아, 그 시각에 강한 오행의 번호(끝자리 하도 수리)와 각 기둥의 60갑자 순번 번호에 가중치. 그 주에는 누구에게나 같은 번호",
+  R => pick6(R, manse().w)];
 const PROFILE = ["saju", "zodiac", "astro"]; // 내 정보가 필요한 전략
+const FIXED = [...PROFILE, "manse"];        // 같은 조건이면 항상 같은 번호가 나오는 전략
 const SKEYS = Object.keys(STRATS);
 const GROUPS = [["통계형", ["balance", "recent", "overdue", "spread"]], ["AI·모델형", ["deep", "markov", "quantum"]],
-  ["운세형 (내 정보 필요)", ["saju", "zodiac", "astro"]], ["무작위", ["random"]]];
+  ["동양 역학형", ["manse", "saju"]], ["서양 점성형", ["zodiac", "astro"]], ["무작위", ["random"]]];
+const optLabel = k => STRATS[k][0] + (PROFILE.includes(k) ? " (내 정보 필요)" : "");
 console.assert(GROUPS.flatMap(g => g[1]).sort().join() === SKEYS.slice().sort().join(), "전략 묶음 누락");
 const optHtml = sel => GROUPS.map(([g, ks]) => `<optgroup label="${g}">`
-  + ks.map(k => `<option value="${k}"${k === sel ? " selected" : ""}>${STRATS[k][0]}</option>`).join("") + "</optgroup>").join("");
-$("stratHelp").innerHTML = SKEYS.map(k => `<b>${STRATS[k][0]}</b> — ${STRATS[k][1]}`).join("<br>")
+  + ks.map(k => `<option value="${k}"${k === sel ? " selected" : ""}>${optLabel(k)}</option>`).join("") + "</optgroup>").join("");
+$("stratHelp").innerHTML = GROUPS.map(([g, ks]) => `<b style="color:var(--accent)">${g}</b><br>` + ks.map(k => `<b>${optLabel(k)}</b> — ${STRATS[k][1]}`).join("<br>")).join("<br><br>") + "<br>"
   + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.";
 $("gameCount").innerHTML = Array.from({ length: 10 }, (_, i) => `<option${i === 4 ? " selected" : ""}>${i + 1}</option>`).join("");
 $("allStrat").innerHTML = `<option value="">게임별로 고르기</option>` + optHtml("");
@@ -486,16 +508,19 @@ function generate() {
     if (prof && !saju) {
       $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 아래 '내 정보 입력'을 먼저 저장하세요.`; return; }
     // 사주·별자리·점성술형은 사람·회차·전략·순번으로 시드를 고정하고 겹침 검사도 하지 않음 (항상 같은 결과)
-    const R = prof ? rng(hashStr(saju.key + (k === "saju" ? "" : k) + i)) : k === "quantum" ? cryptoR : rng(seed + i * 7919);
+    if (k === "manse" && !manse()) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 만세력 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.`; return; }
+    const fixed = FIXED.includes(k);
+    const R = prof ? rng(hashStr(saju.key + (k === "saju" ? "" : k) + i)) : k === "manse" ? rng(hashStr(manse().key + i)) : k === "quantum" ? cryptoR : rng(seed + i * 7919);
     let s, tries = 0;
-    do s = fn(R); while (++tries < 5000 && (!okShape(s) || (!prof && current.some(c => c.s.filter(x => s.includes(x)).length > 2))));
+    do s = fn(R); while (++tries < 5000 && (!okShape(s) || (!fixed && current.some(c => c.s.filter(x => s.includes(x)).length > 2))));
     current.push({ name, s });
     const odd = s.filter(x => x % 2).length;
     $("res" + i).innerHTML = s.map(ball).join("");
     $("why" + i).innerHTML = `<b>${name}</b> · 합 ${s.reduce((a, b) => a + b, 0)} · 홀짝 ${odd}:${6 - odd}`
       + (k === "saju" ? ` · 오행 ${s.map(numOh).join("")}` : "")
       + (k === "astro" ? ` · 수비 ${s.map(dr).join("")}` : "")
-      + (k === "zodiac" ? ` · 별자리 ${s.map(x => SIGNS[(x - 1) % 12][1]).join("")}` : "");
+      + (k === "zodiac" ? ` · 별자리 ${s.map(x => SIGNS[(x - 1) % 12][1]).join("")}` : "")
+      + (k === "manse" ? ` · 추첨 시각 ${manse().pil.map(x => gzK(x) + x.name).join(" ")}` : "");
   });
   $("copy").disabled = !current.length;
   if (choice.some(k => PROFILE.includes(k)) && !saju) $("sjY").focus();

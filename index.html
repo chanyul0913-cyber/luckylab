@@ -189,6 +189,13 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     </ul>
     <p class="warn">⚠️ <b>사주 오행형·별자리형·점성술형·🔮 내 사주 맞춤 배분</b>은 아래 <b>'내 정보 입력'</b>에 생년월일을 넣고 <b>[사주 저장]</b>을 눌러야 번호가 추천됩니다. 저장하지 않으면 해당 게임에는 번호가 나오지 않고 '먼저 저장하세요' 안내만 나옵니다. (오른쪽 유명인 사주 버튼을 눌러도 저장됩니다.) 나머지 전략은 입력 없이 바로 쓸 수 있습니다.</p>
     <p>각 전략이 번호를 어떻게 고르는지는 '번호 뽑기' 아래 <b>'전략 설명'</b>을 눌러 보세요. 모든 전략은 사람들이 많이 고르는 조합(생일 숫자만, 연속 숫자 등)을 피해서, 당첨되면 나눠 가질 사람이 적도록 합니다.</p>
+    <p>또 모든 전략은 아래 조합을 추천하지 않습니다.</p>
+    <ul>
+      <li><b>합성수</b>(1과 소수를 뺀 수)가 5개 이상</li>
+      <li><b>공 색상</b> 5가지(노랑·파랑·빨강·회색·초록)가 모두 들어간 조합</li>
+      <li><b>소수</b>(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43)가 0개이거나 5개 이상</li>
+      <li>로또 용지 <b>가로줄</b>(1~7, 8~14, 15~21 …) 한 줄에 4개 이상, 또는 6개가 모두 서로 다른 줄</li>
+    </ul>
 
     <h3>🔮 내 사주 맞춤 배분</h3>
     <p>사주를 저장한 뒤 '전체 전략'에서 <b>'🔮 내 사주 맞춤 배분'</b>을 고르거나, 사주 결과 아래 <b>[내 사주 맞춤 번호 받기]</b>를 누르면, 내 사주에서 <b>채워야 할 오행</b>에 어울리는 전략으로 게임 수만큼 자동 배분합니다.</p>
@@ -621,8 +628,17 @@ function okShape(s) {
   const d = s[1] - s[0]; if (s.every((x, i) => !i || x - s[i - 1] === d)) return false;       // 등차수열
   if (new Set(s.map(x => Math.min(4, (x - 1) / 10 | 0))).size < 3) return false;               // 한 구간 몰림
   const sm = s.reduce((a, b) => a + b, 0); if (sm < q(0.1) || sm > q(0.9)) return false;
+  // 사용자 지정 제외 규칙
+  const pr = s.filter(x => PRIMES.has(x)).length;
+  if (pr === 0 || pr >= 5) return false;                                // 소수 0개 또는 5개 이상
+  if (s.filter(x => x > 1 && !PRIMES.has(x)).length >= 5) return false; // 합성수 5개 이상 (1은 제외)
+  if (new Set(s.map(x => Math.min(4, (x - 1) / 10 | 0))).size === 5) return false; // 공 색상 5가지 모두
+  const row = {}; s.forEach(x => row[(x - 1) / 7 | 0] = (row[(x - 1) / 7 | 0] || 0) + 1);
+  const rmax = Math.max(...Object.values(row));
+  if (rmax === 1 || rmax >= 4) return false;                            // 용지 가로줄(7칸) 최대 개수 1개 또는 4개 이상
   return !pastSet.has(s.join(","));                                    // 역대 1등 조합 그대로 회피
 }
+const PRIMES = new Set([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43]);
 const overdue = [...NUMS].sort((a, b) => gap(b) - gap(a)).slice(0, 5);
 const STRATS = {
   balance: ["전체 통계 균형형", "역대 출현 빈도를 가중치로 사용", R => pick6(R, freq)],
@@ -632,9 +648,12 @@ const STRATS = {
     const pool = NUMS.filter(x => !overdue.includes(x)), a = []; // 나머지 4개는 미출현 상위 5개를 뺀 40개에서
     while (a.length < 4) a.push(pool.splice(Math.floor(R() * pool.length), 1)[0]);
     return [...o, ...a].sort((x, y) => x - y); }],
-  spread: ["구간 분산형", "1-10·11-20·21-30·31-40·41-45 구간에서 하나씩 + 1개", R => {
-    const s = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 45]].map(([a, b]) => a + Math.floor(R() * (b - a + 1)));
-    let x; do x = 1 + Math.floor(R() * 45); while (s.includes(x)); return [...s, x].sort((a, b) => a - b); }],
+  spread: ["구간 분산형", "1-10·11-20·21-30·31-40·41-45 다섯 구간 중 4곳을 골라 하나씩 + 같은 4구간에서 2개 더 (공 색상 4가지)", R => {
+    const zones = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 45]].sort(() => R() - .5).slice(0, 4);
+    const s = zones.map(([a, b]) => a + Math.floor(R() * (b - a + 1)));
+    const pool = zones.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i)).filter(x => !s.includes(x));
+    while (s.length < 6) s.push(pool.splice(Math.floor(R() * pool.length), 1)[0]);
+    return s.sort((a, b) => a - b); }],
   random: ["무작위 혼합형", "완전 무작위 (형태 필터만 적용)", R => pick6(R)],
   markov: ["마르코프 전이형", `직전 회차(${LAST.n.join(", ")}) 번호 다음 회차에 자주 나온 번호에 가중치 (GitHub 예측 프로젝트들의 '이전 회차 → 다음 회차' 방식)`, R => pick6(R, markovW)],
   quantum: ["양자 확률진폭형", "양자역학을 빗댄 모델: 역대 빈도와 최근 빈도를 두 경로의 진폭으로 보고, 미출현 기간을 위상차로 간섭시켜 |ψ|²에 비례해 '측정'. 측정은 운영체제 하드웨어 난수 사용 (실제 양자 난수 아님)", R => pick6(R, qW)],
@@ -674,7 +693,7 @@ console.assert(GROUPS.flatMap(g => g[1]).sort().join() === SKEYS.slice().sort().
 const optHtml = sel => GROUPS.map(([g, ks]) => `<optgroup label="${g}">`
   + ks.map(k => `<option value="${k}"${k === sel ? " selected" : ""}>${optLabel(k)}</option>`).join("") + "</optgroup>").join("");
 $("stratHelp").innerHTML = GROUPS.map(([g, ks]) => `<b style="color:var(--accent)">${g}</b><br>` + ks.map(k => `<b>${optLabel(k)}</b> — ${STRATS[k][1]}`).join("<br>")).join("<br><br>") + "<br>"
-  + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.";
+  + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.<br><b>추가 제외 규칙</b> — 합성수 5개 이상 · 공 색상 5가지가 모두 들어간 조합 · 소수 0개 또는 5개 이상 · 용지 가로줄(1~7, 8~14 …) 한 줄에 4개 이상이거나 6개가 모두 다른 줄인 조합. 이 규칙들은 취향에 따른 필터이며 1등 확률을 바꾸지 않습니다.";
 $("gameCount").innerHTML = Array.from({ length: 10 }, (_, i) => `<option${i === 4 ? " selected" : ""}>${i + 1}</option>`).join("");
 $("allStrat").innerHTML = `<option value="">게임별로 고르기</option><option value="__saju">🔮 내 사주 맞춤 배분</option>` + optHtml("");
 

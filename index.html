@@ -242,7 +242,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     <h3>자주 묻는 질문</h3>
     <dl>
       <dt>같은 전략인데 번호가 매번 똑같이 나와요.</dt>
-      <dd>만세력형·사주 오행형·별자리형·점성술형은 '정해진 기운'으로 고르기 때문에 같은 사람·같은 회차면 항상 같은 번호가 나옵니다. 다음 회차가 되면 바뀝니다. 나머지 전략(유명인사주형 포함)은 누를 때마다 바뀝니다.</dd>
+      <dd>모든 전략은 누를 때마다 새 번호가 나옵니다. 사주 오행형·만세력형·별자리형·점성술형·유명인사주형은 '그 주의 기운'이 번호 가중치에 반영되고, 무작위 추첨은 누를 때마다 새로 이뤄집니다.</dd>
       <dt>화면 위에 '🔄 새 버전이 나왔어요' 띠가 떠요.</dt>
       <dd>사이트가 고쳐졌거나 새 당첨번호가 들어왔다는 뜻입니다. 띠의 <b>[새로고침]</b>을 누르면 최신 화면으로 바뀝니다. 입력해 둔 사주와 내 목록은 그대로 남습니다. 지금 보던 번호를 먼저 복사하고 싶으면 ✕로 닫았다가 나중에 눌러도 됩니다.</dd>
       <dt>새 회차는 언제 반영되나요?</dt>
@@ -787,7 +787,7 @@ const STRATS = {
   quantum: ["양자 확률진폭형", "양자역학을 빗댄 모델: 역대 빈도와 최근 빈도를 두 경로의 진폭으로 보고, 미출현 기간을 위상차로 간섭시켜 |ψ|²에 비례해 '측정'. 측정은 운영체제 하드웨어 난수 사용 (실제 양자 난수 아님)", (R, c = LIVE) => pick6(R, c.qW)],
   deep: ["딥러닝 LSTM형", "GitHub 인기 예측 프로젝트(LotteryAi 등)와 같은 방식: 직전 10회를 보고 다음 회차를 예측하는 LSTM 신경망을 매주 GitHub 서버에서 학습해 둔 예측 확률로 가중치",
     R => { const avg = dl.p.reduce((a, b) => a + b, 0) / 45; return pick6(R, [0, ...dl.p.map(v => (v / avg) ** 4)]); }],
-  saju: ["사주 오행형", "내 사주의 부족한 오행 + 추첨일 일진 오행 번호에 가중치. 같은 사람·같은 회차·같은 순번이면 항상 같은 번호", (R, c = LIVE) => pick6(R, c.sajuW)],
+  saju: ["사주 오행형", "내 사주의 부족한 오행 + 추첨일 일진 오행 번호에 가중치를 두고 누를 때마다 새로 뽑습니다", (R, c = LIVE) => pick6(R, c.sajuW)],
   zodiac: ["별자리형", "내 태양 별자리 번호(양자리 1 … 물고기자리 12)와 12씩 더한 수, 같은 원소 별자리 번호, 추첨일 별자리 번호에 가중치", (R, c = LIVE) => pick6(R, c.zw)],
   astro: ["점성술형", "번호를 한 자리로 줄인 수(수비학)가 내 별자리 지배행성·태어난 요일 행성·생명수·추첨일 행성의 수와 같으면 가중치", (R, c = LIVE) => pick6(R, c.aw)],
 };
@@ -812,7 +812,7 @@ function manseAt(date) {
   const w = Array(46).fill(0); NUMS.forEach(n => w[n] = 1 + cnt[numOh(n)] + (nums.includes(n) ? 3 : 0)); // 강한 기운을 따름
   return { pil, cnt, nums, w, key };
 }
-STRATS.manse = ["만세력형", "내 정보 없이, 이번 추첨 시각(토 20:35)의 년·월·일·시 4기둥을 만세력으로 뽑아, 그 시각에 강한 오행의 번호(끝자리 하도 수리)와 각 기둥의 60갑자 순번 번호에 가중치. 그 주에는 누구에게나 같은 번호",
+STRATS.manse = ["만세력형", "내 정보 없이, 이번 추첨 시각(토 20:35)의 년·월·일·시 4기둥을 만세력으로 뽑아, 그 시각에 강한 오행의 번호(끝자리 하도 수리)와 각 기둥의 60갑자 순번 번호에 가중치. 이번 주 기운을 반영하며 누를 때마다 새 번호가 나옵니다",
   (R, c = LIVE) => pick6(R, c.manseW)];
 // 유명인사주형: 유명인 전원을 추첨일(토요일) 기준 SAJOO식 운세 점수로 채점, 게임 순서대로 상위 명 배정 (10게임 = 1~10위)
 STRATS.celeb = ["유명인사주형", "아래 유명인·세계 부자 TOP10 사주를 추첨일 토요일 기준 오늘의 운세 점수로 채점합니다 (SAJOO 방식: 일간 기준 일진 십신 + 지지 육합·삼합·충 + 오행 생극 + 용신운 + 천간합). 1게임은 운세 1위, 2게임은 2위 … 10게임은 10위 — 게임 순서의 유명인 사주 오행 가중치로 뽑습니다 (반복 없음). 누를 때마다 새 번호가 나옵니다. 운세 점수는 1등 확률과 무관",
@@ -824,7 +824,6 @@ const LIVE = { qlo: q(0.1), qhi: q(0.9), prev: LAST.n, pastSet, freq, c50, overd
   get celebPlan() { return celebPlan(); } };
 STRATS.btop = ["백테스트형", "아래 백테스트 표에서 3개 이상 맞힌 비율(3+)이 높은 전략 1~5위를 순서대로 게임에 배정 (6게임 이상이면 1위부터 반복, 동률이면 평균 일치가 높은 쪽). 딥러닝은 3+ 기록이 있을 때 최근 100회 기준으로 함께 비교. 순위 차이는 우연 범위이며, 이 방식 자체의 성적도 백테스트 표에 나옵니다", null];
 const PROFILE = ["saju", "zodiac", "astro"]; // 내 정보가 필요한 전략
-const FIXED = [...PROFILE, "manse"];        // 같은 조건이면 항상 같은 번호가 나오는 전략
 const SKEYS = Object.keys(STRATS);
 const GROUPS = [["통계형", ["balance", "recent", "overdue", "spread"]], ["AI·모델형", ["deep", "markov", "quantum"]], ["백테스트형", ["btop"]],
   ["동양 역학형", ["manse", "saju", "celeb"]], ["서양 점성형", ["zodiac", "astro"]], ["무작위", ["random"]]];
@@ -914,10 +913,9 @@ function generate() {
     // 사주·별자리·점성술형은 사람·회차·전략·순번으로 시드를 고정하고 겹침 검사도 하지 않음 (항상 같은 결과)
     if (k === "manse" && !manse()) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 만세력 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.`; return; }
     if (k === "celeb" && !celebPlan()) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 유명인 사주를 계산하지 못했습니다. 인터넷 연결을 확인하세요.`; return; }
-    const fixed = FIXED.includes(k);
-    const R = prof ? rng(hashStr(saju.key + (k === "saju" ? "" : k) + i)) : k === "manse" ? rng(hashStr(manse().key + i)) : k === "quantum" ? cryptoR : rng(seed + i * 7919);
+    const R = k === "quantum" ? cryptoR : rng(seed + i * 7919);
     let s, tries = 0;
-    do s = fn(R, undefined, i); while (++tries < 5000 && (!okShape(s) || (!fixed && current.some(c => c.s.filter(x => s.includes(x)).length > 2))));
+    do s = fn(R, undefined, i); while (++tries < 5000 && (!okShape(s) || current.some(c => c.s.filter(x => s.includes(x)).length > 2)));
     current.push({ name, s });
     const odd = s.filter(x => x % 2).length;
     $("res" + i).innerHTML = s.map(ball).join("");

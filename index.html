@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로또 분석소</title>
+<style>
+:root{
+  --bg:#f6f5f1;--card:#ffffff;--ink:#1d1d1f;--ink2:#55565c;--muted:#8a8b91;--line:#e4e2dc;
+  --accent:#b8860b;--bar:#3b6fb6;--bar2:#9cb6dc;--good:#2e7d4f;--warn:#b45309;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121318;--card:#1c1d24;--ink:#ecebe6;--ink2:#b4b3ad;--muted:#85858c;--line:#2e2f38;
+  --accent:#e0b44c;--bar:#6f9be0;--bar2:#3b4f72;--good:#5cc28a;--warn:#f0a35a;}}
+:root[data-theme="dark"]{
+  --bg:#121318;--card:#1c1d24;--ink:#ecebe6;--ink2:#b4b3ad;--muted:#85858c;--line:#2e2f38;
+  --accent:#e0b44c;--bar:#6f9be0;--bar2:#3b4f72;--good:#5cc28a;--warn:#f0a35a;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:26px;margin:0 0 4px}
+h2{font-size:18px;margin:0 0 4px}
+.sub{color:var(--ink2);margin:0 0 20px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.note{color:var(--muted);font-size:13px;margin:6px 0 0}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.balls{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ball{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:15px;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.35);flex:none}
+.b1{background:#e6a400}.b2{background:#2f7fd0}.b3{background:#d9453b}.b4{background:#7d7d7d}.b5{background:#3ea34a}
+.plus{color:var(--muted);font-weight:700}
+.set{display:grid;grid-template-columns:24px 1fr;gap:4px 10px;padding:12px 0;border-top:1px solid var(--line)}
+.set:first-of-type{border-top:0}
+.set .idx{color:var(--muted);font-weight:700;padding-top:7px}
+.set .why{grid-column:2;color:var(--ink2);font-size:13px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 16px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#1a1300;font-weight:700}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink2);font-weight:600}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--ink2)}
+.tag.ok{color:var(--good);border-color:var(--good)}
+.tag.no{color:var(--warn);border-color:var(--warn)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){.grid2{grid-template-columns:1fr}}
+.mini{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:14px}
+.mini .ball{width:28px;height:28px;font-size:13px}
+.mini span:last-child{color:var(--ink2)}
+/* 빈도 막대 */
+.chart{position:relative}
+.bars{display:flex;align-items:flex-end;gap:2px;height:160px;border-bottom:1px solid var(--line);position:relative}
+.bars div{flex:1;background:var(--bar);border-radius:4px 4px 0 0;min-width:0}
+.bars div:hover,.bars div.on{background:var(--accent)}
+.expline{position:absolute;left:0;right:0;border-top:1.5px dashed var(--muted);pointer-events:none}
+.axis{display:flex;gap:2px;font-size:10px;color:var(--muted)}
+.axis span{flex:1;text-align:center;min-width:0}
+.hbar{display:grid;grid-template-columns:52px 1fr 70px;align-items:center;gap:8px;font-size:13px;margin:3px 0}
+.hbar .track{position:relative;height:14px}
+.hbar .fill{height:100%;background:var(--bar);border-radius:0 4px 4px 0}
+.hbar .theo{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:12px;height:10px;background:var(--bar);border-radius:2px;margin-right:4px;vertical-align:middle}
+.legend i.t{width:2px;height:12px;background:var(--ink)}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:5px 8px;border-radius:6px;display:none;z-index:9;white-space:nowrap}
+.toast{color:var(--good);font-size:13px}
+details summary{cursor:pointer;color:var(--ink2);font-size:14px}
+select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 8px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink2);margin-bottom:10px}
+.form label.inl,label.inl{display:inline-flex;flex-direction:row;align-items:center;gap:6px;margin:0 12px 0 0;font-size:14px;color:var(--ink)}
+.form fieldset{border:0;padding:0;margin:0 0 10px}
+.form legend{font-size:13px;color:var(--ink2);margin-bottom:4px}
+.ymd{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ymd label{min-width:0}.ymd input,.ymd select{width:100%}
+.set{grid-template-columns:52px 1fr}
+.set select{max-width:100%}
+.pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin:12px 0}
+.pillars div{border:1px solid var(--line);border-radius:10px;padding:6px 0}
+.pillars small{display:block;color:var(--muted);font-size:12px}
+.pillars b{display:block;font-size:20px;line-height:1.5}
+.oh{display:grid;grid-template-columns:44px 1fr 28px;align-items:center;gap:8px;font-size:13px;margin:3px 0}
+.oh .fill{height:12px;border-radius:0 4px 4px 0;background:var(--bar)}
+.o-목{color:#2e8b57}.o-화{color:#d9453b}.o-토{color:#b8860b}.o-금{color:#7d7d7d}.o-수{color:#2f6fb0}
+</style>
+</head>
+<body>
+<main>
+  <h1>로또 6/45 분석소</h1>
+  <p class="sub" id="meta">데이터 불러오는 중…</p>
+
+  <section class="card" id="latest"></section>
+
+  <section class="card">
+    <h2>번호 뽑기 <span class="tag" id="target"></span></h2>
+    <p class="note">게임 수와 게임별 전략을 고른 뒤 '번호 뽑기'를 누르세요. 어느 전략이든 1등 확률은 똑같이 1/8,145,060입니다.</p>
+    <div class="row" style="margin:12px 0">
+      <label class="inl">게임 수 <select id="gameCount"></select></label>
+      <label class="inl">전체 전략 <select id="allStrat"></select></label>
+    </div>
+    <div id="sets"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" id="again">번호 뽑기</button>
+      <button id="copy" disabled>번호 복사</button>
+      <span class="toast" id="toast" role="status"></span>
+    </div>
+    <details style="margin-top:10px"><summary>전략 설명</summary><div id="stratHelp" class="note"></div></details>
+  </section>
+  <section class="card" id="sajuCard">
+    <h2>내 사주 입력 <span class="tag">사주 전략용</span></h2>
+    <p class="note">사주 전략을 쓸 때만 필요합니다. 입력값은 이 브라우저에만 저장됩니다.</p>
+    <form id="sajuForm" class="form">
+      <label>이름(선택)<input id="sjName" maxlength="20" placeholder="닉네임"></label>
+      <fieldset><legend>달력</legend>
+        <label class="inl"><input type="radio" name="cal" value="solar" checked> 양력</label>
+        <label class="inl"><input type="radio" name="cal" value="lunar"> 음력</label>
+        <label class="inl"><input type="checkbox" id="sjLeap"> 윤달</label>
+      </fieldset>
+      <div class="ymd">
+        <label>년<input id="sjY" type="number" min="1900" max="2100" required placeholder="1990"></label>
+        <label>월<input id="sjM" type="number" min="1" max="12" required placeholder="5"></label>
+        <label>일<input id="sjD" type="number" min="1" max="31" required placeholder="15"></label>
+      </div>
+      <div class="ymd">
+        <label>태어난 시<select id="sjH"><option value="">모름</option></select></label>
+        <label>분<select id="sjMi"></select></label>
+      </div>
+      <div class="row"><button class="primary" type="submit">사주 저장</button><span class="toast" id="sjMsg" role="status"></span></div>
+    </form>
+    <div id="sajuOut"></div>
+  </section>
+
+
+  <section class="card">
+    <h2>추첨기는 공정한가 — 카이제곱 검정</h2>
+    <p class="note" id="chiTxt"></p>
+    <div class="chart" style="margin-top:12px">
+      <div class="bars" id="freqBars" role="img" aria-label="번호별 역대 출현 횟수 막대그래프"></div>
+      <div class="axis" id="freqAxis"></div>
+    </div>
+    <div class="legend"><span><i></i>역대 출현 횟수</span><span>점선 = 균일하다면 기대되는 횟수</span></div>
+    <details style="margin-top:10px"><summary>표로 보기</summary><table id="freqTable"></table></details>
+  </section>
+
+  <section class="card grid2">
+    <div><h2>핫 번호</h2><p class="note">최근 50회 많이 나온 번호 (기대 6.7회)</p><div id="hot"></div></div>
+    <div><h2>장기 미출현</h2><p class="note">마지막 출현 후 지난 회차</p><div id="cold"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>구조 검정 — 과거 번호에 숨은 패턴이 있나</h2>
+    <table id="tests"></table>
+    <h2 style="margin-top:18px;font-size:15px">홀수 개수 분포</h2>
+    <div id="oddChart"></div>
+    <div class="legend"><span><i></i>실제 회차 수</span><span><i class="t"></i>무작위 이론값</span></div>
+  </section>
+
+  <section class="card">
+    <h2>백테스트 — 이 전략들이 실제로 맞췄나</h2>
+    <p class="note" id="btTxt"></p>
+    <table id="bt"></table>
+  </section>
+
+  <section class="card">
+    <h2>정직한 한계</h2>
+    <p class="note" style="color:var(--ink2)">추첨은 매 회차 독립입니다. 위 검정처럼 과거 번호는 무작위와 구별되지 않고, 백테스트에서도 어떤 전략도 무작위보다 낫지 않았습니다.
+    추천 조합의 유일한 수학적 이점은 <b>다른 사람과 덜 겹치는 조합</b>이라 당첨 시 나눠 가질 사람이 적다는 점뿐입니다. 재미와 참고용으로만 쓰세요.</p>
+  </section>
+</main>
+<div id="tip"></div>
+
+<script src="data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+if (!window.LOTTO) { $("meta").textContent = "data.js가 없습니다. fetch_lotto.py를 먼저 실행하세요."; throw new Error("no data"); }
+
+// ---------- 데이터 ----------
+const D = LOTTO.map(r => ({ no: r[0], ymd: r[1], n: r.slice(2, 8), b: r[8], w1: r[9], a1: r[10] }));
+const N = D.length, LAST = D[N - 1];
+const NUMS = Array.from({ length: 45 }, (_, i) => i + 1);
+const C = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = r * (n - k + i) / i; return r; };
+const fmtDate = s => `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6)}`;
+const ballCls = x => "b" + (x <= 10 ? 1 : x <= 20 ? 2 : x <= 30 ? 3 : x <= 40 ? 4 : 5);
+const ball = x => `<span class="ball ${ballCls(x)}">${x}</span>`;
+const won = v => v >= 1e8 ? (v / 1e8).toFixed(1) + "억원" : v.toLocaleString() + "원";
+
+// 표준정규 누적분포 (Abramowitz-Stegun 7.1.26)
+function Phi(z) { const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+  const e = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z / 2);
+  return z >= 0 ? (1 + e) / 2 : (1 - e) / 2; }
+// 카이제곱 상단 p값 (Wilson-Hilferty 근사, df가 클 때 충분히 정확)
+const chiP = (x, k) => 1 - Phi((Math.cbrt(x / k) - (1 - 2 / (9 * k))) / Math.sqrt(2 / (9 * k)));
+// 재현 가능한 난수
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------- 기본 통계 ----------
+const freq = Array(46).fill(0), last = Array(46).fill(0);
+D.forEach(d => d.n.forEach(x => { freq[x]++; last[x] = d.no; }));
+const EXP = N * 6 / 45;
+const chi = NUMS.reduce((s, k) => s + (freq[k] - EXP) ** 2 / EXP, 0), chiPv = chiP(chi, 44);
+const c50 = Array(46).fill(0); D.slice(-50).forEach(d => d.n.forEach(x => c50[x]++));
+const gap = k => LAST.no - last[k];
+const sums = D.map(d => d.n.reduce((a, b) => a + b, 0)).sort((a, b) => a - b);
+const q = p => sums[Math.floor(p * (N - 1))];
+const pastSet = new Set(D.map(d => d.n.join(",")));
+
+$("meta").textContent = `동행복권 제1회(${fmtDate(D[0].ymd)}) ~ 제${LAST.no}회(${fmtDate(LAST.ymd)}) 실제 당첨번호 ${N}회 분석`;
+$("target").textContent = `제${LAST.no + 1}회 대상`;
+$("latest").innerHTML = `<h2>최근 추첨 — 제${LAST.no}회 <span class="tag">${fmtDate(LAST.ymd)}</span></h2>
+  <div class="balls" style="margin:10px 0">${LAST.n.map(ball).join("")}<span class="plus">+</span>${ball(LAST.b)}</div>
+  <p class="note">1등 ${LAST.w1}명 · 1인당 ${won(LAST.a1)}</p>`;
+
+// ---------- 빈도 차트 ----------
+const tip = $("tip");
+const showTip = (e, html) => { tip.innerHTML = html; tip.style.display = "block";
+  tip.style.left = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = (e.clientY - 34) + "px"; };
+const hideTip = () => tip.style.display = "none";
+const fmax = Math.max(...freq), fmin = Math.min(...freq.slice(1)), lo = Math.floor(fmin * 0.8);
+$("freqBars").innerHTML = NUMS.map(k => `<div data-k="${k}" style="height:${(freq[k] - lo) / (fmax - lo) * 100}%"></div>`).join("")
+  + `<span class="expline" style="bottom:${(EXP - lo) / (fmax - lo) * 100}%"></span>`;
+$("freqAxis").innerHTML = NUMS.map(k => `<span>${k % 5 === 0 || k === 1 ? k : ""}</span>`).join("");
+$("freqBars").querySelectorAll("div").forEach(el => {
+  const k = +el.dataset.k;
+  el.addEventListener("mousemove", e => showTip(e, `${k}번 — ${freq[k]}회 (기대 ${EXP.toFixed(0)}회)`));
+  el.addEventListener("mouseleave", hideTip);
+});
+$("chiTxt").innerHTML = `45개 번호 출현 횟수를 '모두 같은 확률' 가정과 비교: χ² = ${chi.toFixed(1)}, 자유도 44, p = ${chiPv.toFixed(2)} → `
+  + (chiPv > 0.05 ? `<b>무작위 범위 안</b>. 많이 나온 번호와 적게 나온 번호의 차이는 우연으로 설명됩니다.` : `<b>균일하지 않을 가능성</b>이 있습니다.`)
+  + ` 세로축은 ${lo}회부터 시작합니다.`;
+$("freqTable").innerHTML = "<tr><th>번호</th><th>출현</th><th>최근50</th><th>미출현</th></tr>"
+  + NUMS.map(k => `<tr><td>${k}</td><td>${freq[k]}</td><td>${c50[k]}</td><td>${gap(k)}회</td></tr>`).join("");
+
+const mini = (k, txt) => `<div class="mini">${ball(k)}<span>${txt}</span></div>`;
+$("hot").innerHTML = [...NUMS].sort((a, b) => c50[b] - c50[a] || a - b).slice(0, 6).map(k => mini(k, `${c50[k]}회`)).join("");
+$("cold").innerHTML = [...NUMS].sort((a, b) => gap(b) - gap(a) || a - b).slice(0, 6).map(k => mini(k, `${gap(k)}회째`)).join("");
+
+// ---------- 구조 검정 ----------
+const tests = [];
+// 이월수: 직전 회차 번호가 다시 나온 개수. 무기억이면 기대 0.8
+let carry = 0; for (let i = 1; i < N; i++) carry += D[i].n.filter(x => D[i - 1].n.includes(x)).length;
+tests.push(["이월수 (직전 회차 번호 재출현)", `평균 ${(carry / (N - 1)).toFixed(3)}개`, "기대 0.800", Math.abs(carry / (N - 1) - 0.8) < 3 * Math.sqrt(0.8 * 0.53 / (N - 1))]);
+// 쌍 동시출현: 최다 쌍이 무작위 시뮬레이션 범위 안인가
+const pair = new Map(); D.forEach(d => { for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) { const key = d.n[i] * 46 + d.n[j]; pair.set(key, (pair.get(key) || 0) + 1); } });
+let pmax = 0, pkey = 0; pair.forEach((v, k) => { if (v > pmax) { pmax = v; pkey = k; } });
+const simMax = []; const R0 = rng(7);
+for (let s = 0; s < 40; s++) { const m = new Int16Array(46 * 46); let mx = 0;
+  for (let i = 0; i < N; i++) { const t = pick6(R0); for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) { const v = ++m[t[a] * 46 + t[b]]; if (v > mx) mx = v; } }
+  simMax.push(mx); }
+simMax.sort((a, b) => a - b);
+tests.push([`쌍 동시출현 (최다 ${Math.floor(pkey / 46)}-${pkey % 46})`, `${pmax}회`, `무작위 최다 ${simMax[1]}~${simMax[38]}회`, pmax >= simMax[1] && pmax <= simMax[38]]);
+// 합계
+const mean = sums.reduce((a, b) => a + b, 0) / N;
+tests.push(["번호 합계 평균", mean.toFixed(1), "이론 138.0", Math.abs(mean - 138) < 3 * 29.9 / Math.sqrt(N)]);
+// 연속번호
+const cons = D.filter(d => d.n.some((x, i) => i && x - d.n[i - 1] === 1)).length / N, consT = 1 - C(40, 6) / C(45, 6);
+tests.push(["연속번호 포함 회차", (cons * 100).toFixed(1) + "%", "이론 " + (consT * 100).toFixed(1) + "%", Math.abs(cons - consT) < 3 * Math.sqrt(consT * (1 - consT) / N)]);
+tests.push(["번호별 출현 균일성", `χ² ${chi.toFixed(1)}`, `p = ${chiPv.toFixed(2)}`, chiPv > 0.05]);
+$("tests").innerHTML = "<tr><th>검정</th><th>실제</th><th>무작위 기준</th><th>판정</th></tr>"
+  + tests.map(([a, b, c, ok]) => `<tr><td>${a}</td><td>${b}</td><td>${c}</td><td><span class="tag ${ok ? "ok" : "no"}">${ok ? "패턴 없음" : "차이 있음"}</span></td></tr>`).join("");
+
+const odd = Array(7).fill(0); D.forEach(d => odd[d.n.filter(x => x % 2).length]++);
+const oddT = k => N * C(23, k) * C(22, 6 - k) / C(45, 6), omax = Math.max(...odd, ...[0,1,2,3,4,5,6].map(oddT));
+$("oddChart").innerHTML = odd.map((v, k) => `<div class="hbar" data-k="${k}"><span>홀 ${k}개</span>
+  <div class="track"><div class="fill" style="width:${v / omax * 100}%"></div><div class="theo" style="left:${oddT(k) / omax * 100}%"></div></div>
+  <span style="text-align:right">${v} / ${oddT(k).toFixed(0)}</span></div>`).join("");
+document.querySelectorAll("#oddChart .hbar").forEach(el => { const k = +el.dataset.k;
+  el.addEventListener("mousemove", e => showTip(e, `홀수 ${k}개: 실제 ${odd[k]}회 · 이론 ${oddT(k).toFixed(1)}회`)); el.addEventListener("mouseleave", hideTip); });
+
+// ---------- 사주 ----------
+// 사주 8글자는 lunar-javascript(6tail, MIT)로 계산. 번호 매핑은 하도(河圖) 오행 수리 + 부족 오행 보완 + 추첨일 일진.
+const GAN = "甲乙丙丁戊己庚辛壬癸", GAN_K = "갑을병정무기경신임계", JI = "子丑寅卯辰巳午未申酉戌亥", JI_K = "자축인묘진사오미신유술해";
+const GAN_OH = ["목", "목", "화", "화", "토", "토", "금", "금", "수", "수"];
+const JI_OH = ["수", "토", "목", "목", "토", "화", "화", "토", "금", "금", "토", "수"];
+const OHS = ["목", "화", "토", "금", "수"];
+const DIGIT_OH = ["토", "수", "화", "목", "금", "토", "수", "화", "목", "금"]; // 끝자리 1·6 수, 2·7 화, 3·8 목, 4·9 금, 5·0 토
+const numOh = n => DIGIT_OH[n % 10];
+const ohDigits = o => DIGIT_OH.map((x, d) => x === o ? d : -1).filter(d => d >= 0).join("·");
+const drawDate = new Date(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + 7, 12);
+const hashStr = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.codePointAt(0), 16777619); return h >>> 0; };
+let saju = null;
+
+function calcSaju(p) {
+  if (!window.Solar || !window.Lunar) throw new Error("사주 계산 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.");
+  const known = p.h !== "";
+  let solar = p.cal === "lunar"
+    ? Lunar.fromYmdHms(p.y, p.leap ? -p.m : p.m, p.d, known ? +p.h : 12, known ? +p.mi : 0, 0).getSolar()
+    : Solar.fromYmdHms(p.y, p.m, p.d, known ? +p.h : 12, known ? +p.mi : 0, 0);
+  const chk = new Date(solar.getYear(), solar.getMonth() - 1, solar.getDay());
+  if (chk.getMonth() !== solar.getMonth() - 1) throw new Error("존재하지 않는 날짜입니다.");
+  if (p.cal === "solar" && (solar.getMonth() !== p.m || solar.getDay() !== p.d)) throw new Error("존재하지 않는 날짜입니다.");
+  // 한국 표준시는 동경 135° 기준이고 서울은 약 127°라 실제 태양시가 약 30분 늦음 → 시주 경계(23:30, 01:30 …)에 맞춰 30분 보정
+  if (known) solar = Solar.fromDate(new Date(solar.getYear(), solar.getMonth() - 1, solar.getDay(), solar.getHour(), solar.getMinute() - 30));
+  const ec = solar.getLunar().getEightChar();
+  const names = ["년주", "월주", "일주", "시주"];
+  const raw = [ec.getYear(), ec.getMonth(), ec.getDay(), known ? ec.getTime() : null];
+  const pillars = raw.map((s, i) => s && { name: names[i], gan: GAN.indexOf(s[0]), ji: JI.indexOf(s[1]), hanja: s });
+  const cnt = Object.fromEntries(OHS.map(o => [o, 0]));
+  pillars.forEach(x => { if (x) { cnt[GAN_OH[x.gan]]++; cnt[JI_OH[x.ji]]++; } });
+  const dz = Solar.fromDate(drawDate).getLunar().getDayInGanZhi();
+  const draw = { gan: GAN.indexOf(dz[0]), ji: JI.indexOf(dz[1]), hanja: dz };
+  const mx = Math.max(...Object.values(cnt));
+  const ohW = Object.fromEntries(OHS.map(o => [o, (mx - cnt[o]) + 1 + (o === GAN_OH[draw.gan] ? 2 : 0) + (o === JI_OH[draw.ji] ? 1 : 0)]));
+  const w = Array(46).fill(0); NUMS.forEach(n => w[n] = ohW[numOh(n)]);
+  const key = raw.join("") + drawDate.toDateString();
+  return { name: p.name, pillars, cnt, draw, ohW, w, key, known, solar: solar.toYmd(), cal: p.cal };
+}
+const gzK = x => GAN_K[x.gan] + JI_K[x.ji];
+function renderSaju() {
+  if (!saju) { $("sajuOut").innerHTML = ""; return; }
+  const s = saju, mxC = Math.max(...Object.values(s.cnt), 1), best = OHS.reduce((a, b) => s.ohW[b] > s.ohW[a] ? b : a);
+  $("sajuOut").innerHTML = `<h2 style="margin-top:8px">${s.name ? s.name + "님의 " : ""}사주팔자</h2>
+    <div class="pillars">${[...s.pillars].reverse().map(x => x ? `<div><small>${x.name}</small>
+      <b class="o-${GAN_OH[x.gan]}">${GAN_K[x.gan]}</b><b class="o-${JI_OH[x.ji]}">${JI_K[x.ji]}</b><small>${x.hanja}</small></div>`
+      : `<div><small>시주</small><b>?</b><b>?</b><small>시간 모름</small></div>`).join("")}</div>
+    ${OHS.map(o => `<div class="oh"><span class="o-${o}"><b>${o}</b></span><div><div class="fill" style="width:${s.cnt[o] / mxC * 100}%"></div></div><span>${s.cnt[o]}</span></div>`).join("")}
+    <p class="note">제${LAST.no + 1}회 추첨일(${drawDate.getMonth() + 1}/${drawDate.getDate()}) 일진은 <b>${gzK(s.draw)}(${s.draw.hanja})</b>입니다.
+      부족한 오행일수록, 그리고 일진의 오행(${GAN_OH[s.draw.gan]}·${JI_OH[s.draw.ji]})일수록 가중치를 높였습니다.
+      가장 힘을 주는 오행은 <b class="o-${best}">${best}</b>, 끝자리 ${ohDigits(best)}인 번호입니다.</p>
+    <p class="note">오행 가중치: ${OHS.map(o => `${o} ${s.ohW[o]} (끝자리 ${ohDigits(o)})`).join(" · ")}</p>`;
+}
+
+// ---------- 전략 ----------
+function pick6(R, w) { // 가중치 w로 비복원 6개 (w 없으면 균등)
+  const pool = NUMS.slice(), ws = pool.map(k => w ? w[k] : 1), out = [];
+  while (out.length < 6) { let t = ws.reduce((a, b) => a + b, 0) * R(), i = 0;
+    while ((t -= ws[i]) > 0 && i < pool.length - 1) i++;
+    out.push(pool.splice(i, 1)[0]); ws.splice(i, 1); }
+  return out.sort((a, b) => a - b);
+}
+// 사람들이 몰리는 조합 회피 + 역대 형태 범위
+function okShape(s) {
+  if (s.filter(x => x >= 32).length < 2) return false;                 // 생일(1~31)만의 조합 회피
+  if (s.some((x, i) => i >= 2 && x - s[i - 1] === 1 && s[i - 1] - s[i - 2] === 1)) return false; // 3연속
+  const d = s[1] - s[0]; if (s.every((x, i) => !i || x - s[i - 1] === d)) return false;       // 등차수열
+  if (new Set(s.map(x => Math.min(4, (x - 1) / 10 | 0))).size < 3) return false;               // 한 구간 몰림
+  const sm = s.reduce((a, b) => a + b, 0); if (sm < q(0.1) || sm > q(0.9)) return false;
+  return !pastSet.has(s.join(","));                                    // 역대 1등 조합 그대로 회피
+}
+const overdue = [...NUMS].sort((a, b) => gap(b) - gap(a)).slice(0, 5);
+const STRATS = {
+  balance: ["전체 통계 균형형", "역대 출현 빈도를 가중치로 사용", R => pick6(R, freq)],
+  recent: ["최근 50회 참고형", "최근 50회 출현 횟수 + 1을 가중치로 사용", R => pick6(R, c50.map(v => v + 1))],
+  overdue: ["미출현 포함형", `장기 미출현 상위 5개(${overdue.join(", ")}) 중 2개 + 나머지 무작위`, R => {
+    const a = pick6(R).filter(x => !overdue.includes(x)); const o = overdue.slice().sort(() => R() - .5).slice(0, 2);
+    return [...o, ...a.slice(0, 4)].sort((x, y) => x - y); }],
+  spread: ["구간 분산형", "1-10·11-20·21-30·31-40·41-45 구간에서 하나씩 + 1개", R => {
+    const s = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 45]].map(([a, b]) => a + Math.floor(R() * (b - a + 1)));
+    let x; do x = 1 + Math.floor(R() * 45); while (s.includes(x)); return [...s, x].sort((a, b) => a - b); }],
+  random: ["무작위 혼합형", "완전 무작위 (형태 필터만 적용)", R => pick6(R)],
+  saju: ["사주 오행형", "내 사주의 부족한 오행 + 추첨일 일진 오행 번호에 가중치. 같은 사람·같은 회차·같은 순번이면 항상 같은 번호", R => pick6(R, saju.w)],
+};
+const SKEYS = Object.keys(STRATS);
+const optHtml = sel => SKEYS.map(k => `<option value="${k}"${k === sel ? " selected" : ""}>${STRATS[k][0]}</option>`).join("");
+$("stratHelp").innerHTML = SKEYS.map(k => `<b>${STRATS[k][0]}</b> — ${STRATS[k][1]}`).join("<br>")
+  + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.";
+$("gameCount").innerHTML = Array.from({ length: 10 }, (_, i) => `<option${i === 4 ? " selected" : ""}>${i + 1}</option>`).join("");
+$("allStrat").innerHTML = `<option value="">게임별로 고르기</option>` + optHtml("");
+
+let choice = SKEYS.slice(0, 5), current = [];
+function renderRows() {
+  const n = +$("gameCount").value;
+  while (choice.length < n) choice.push(SKEYS[choice.length % 5]);
+  choice.length = n; current = [];
+  $("copy").disabled = true;
+  $("sets").innerHTML = choice.map((k, i) => `<div class="set"><span class="idx">${i + 1}게임</span>
+    <select data-i="${i}" aria-label="${i + 1}게임 전략">${optHtml(k)}</select>
+    <div class="balls" id="res${i}" style="grid-column:2"></div><div class="why" id="why${i}"></div></div>`).join("");
+  $("sets").querySelectorAll("select").forEach(el => el.onchange = () => { choice[+el.dataset.i] = el.value; $("allStrat").value = ""; });
+}
+$("gameCount").onchange = renderRows;
+$("allStrat").onchange = () => { if ($("allStrat").value) { choice = choice.map(() => $("allStrat").value); renderRows(); $("allStrat").value = choice[0]; } };
+renderRows();
+
+function generate() {
+  const seed = (Math.random() * 2 ** 31) | 0; current = [];
+  choice.forEach((k, i) => {
+    const [name, , fn] = STRATS[k];
+    if (k === "saju" && !saju) {
+      $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 아래 '내 사주 입력'을 먼저 저장하세요.`; return; }
+    // 사주형은 사람·회차·순번으로 시드를 고정하고 다른 게임과의 겹침 검사도 하지 않음 (항상 같은 결과)
+    const R = rng(k === "saju" ? hashStr(saju.key + i) : seed + i * 7919);
+    let s, tries = 0;
+    do s = fn(R); while (++tries < 5000 && (!okShape(s) || (k !== "saju" && current.some(c => c.s.filter(x => s.includes(x)).length > 2))));
+    current.push({ name, s });
+    const odd = s.filter(x => x % 2).length;
+    $("res" + i).innerHTML = s.map(ball).join("");
+    $("why" + i).innerHTML = `<b>${name}</b> · 합 ${s.reduce((a, b) => a + b, 0)} · 홀짝 ${odd}:${6 - odd}`
+      + (k === "saju" ? ` · 오행 ${s.map(numOh).join("")}` : "");
+  });
+  $("copy").disabled = !current.length;
+  if (choice.includes("saju") && !saju) $("sjY").focus();
+}
+$("again").onclick = generate;
+$("copy").onclick = async () => {
+  const txt = `로또 6/45 제${LAST.no + 1}회 분석 조합\n` + current.map((c, i) => `${i + 1}. ${c.s.join(" ")} (${c.name})`).join("\n");
+  try { await navigator.clipboard.writeText(txt); $("toast").textContent = "복사했어요"; }
+  catch { $("toast").textContent = "복사 실패 — 직접 선택해 복사하세요"; }
+  setTimeout(() => $("toast").textContent = "", 2000);
+};
+
+// 사주 입력 폼
+$("sjH").innerHTML += Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, "0")}시</option>`).join("");
+$("sjMi").innerHTML = Array.from({ length: 60 }, (_, m) => `<option value="${m}">${String(m).padStart(2, "0")}분</option>`).join("");
+const readForm = () => ({ name: $("sjName").value.trim(), cal: document.querySelector("input[name=cal]:checked").value,
+  leap: $("sjLeap").checked, y: +$("sjY").value, m: +$("sjM").value, d: +$("sjD").value, h: $("sjH").value, mi: $("sjMi").value });
+function applyProfile(p, save) {
+  try { saju = calcSaju(p); renderSaju(); $("sjMsg").textContent = save ? "저장했어요" : "";
+    if (save) try { localStorage.setItem("lottoSaju", JSON.stringify(p)); } catch {} }
+  catch (e) { saju = null; renderSaju(); $("sjMsg").textContent = e.message; }
+}
+$("sajuForm").onsubmit = e => { e.preventDefault(); applyProfile(readForm(), true); };
+try {
+  const p = JSON.parse(localStorage.getItem("lottoSaju") || "null");
+  if (p) { $("sjName").value = p.name; document.querySelector(`input[name=cal][value=${p.cal === "lunar" ? "lunar" : "solar"}]`).checked = true;
+    $("sjLeap").checked = p.leap; $("sjY").value = p.y; $("sjM").value = p.m; $("sjD").value = p.d; $("sjH").value = p.h; $("sjMi").value = p.mi;
+    applyProfile(p, false); }
+} catch {}
+
+// ---------- 백테스트 (각 회차는 직전 회차까지만 사용) ----------
+(function backtest() {
+  const START = 101, f = Array(46).fill(0), l = Array(46).fill(0), R = rng(12345);
+  const top = (score, asc) => NUMS.slice().sort((a, b) => asc ? score[a] - score[b] || a - b : score[b] - score[a] || a - b);
+  const split5 = o => [0, 1, 2, 3, 4].map(i => [0, 1, 2, 3, 4, 5].map(j => o[i + j * 5])); // 상위 30개를 겹치지 않게 5세트
+  const models = {
+    "전체 빈도": (h) => split5(top(f)),
+    "최근 50회 빈도": (h) => { const c = Array(46).fill(0); h.slice(-50).forEach(d => d.n.forEach(x => c[x]++)); return split5(top(c)); },
+    "장기 미출현": (h) => split5(top(l, true)),
+    "무작위": () => [0, 1, 2, 3, 4].map(() => pick6(R)),
+  };
+  const res = Object.fromEntries(Object.keys(models).map(k => [k, { hit: 0, h3: 0, h4: 0, n: 0 }]));
+  D.forEach((d, i) => {
+    if (d.no >= START) {
+      const win = new Set(d.n), hist = D.slice(0, i);
+      for (const [k, fn] of Object.entries(models)) for (const s of fn(hist)) {
+        const h = s.filter(x => win.has(x)).length; const r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4; }
+    }
+    d.n.forEach(x => { f[x]++; l[x] = d.no; }); // 예측이 끝난 뒤에야 이 회차를 학습
+  });
+  const MU = 0.8, VAR = 0.8 * (39 / 45) * (39 / 44), P3 = [3, 4, 5, 6].reduce((s, k) => s + C(6, k) * C(39, 6 - k), 0) / C(45, 6);
+  $("btTxt").innerHTML = `제${START}회~제${LAST.no}회 ${N - START + 1}회를, 매 회차 <b>그 이전 데이터만</b> 보고 5게임씩 뽑아 실제 결과와 맞춰 봤습니다.
+    무작위 기준: 게임당 평균 0.800개 일치, 3개 이상 ${(P3 * 100).toFixed(2)}%. 전략을 3개 비교하므로 |z| &gt; 2.39여야 유의합니다.`;
+  $("bt").innerHTML = "<tr><th>전략</th><th>평균 일치</th><th>3개+</th><th>4개+</th><th>z</th><th>판정</th></tr>"
+    + Object.entries(res).map(([k, r]) => { const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n), sig = k !== "무작위" && Math.abs(z) > 2.39;
+      return `<tr><td>${k}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${z >= 0 ? "+" : ""}${z.toFixed(2)}</td>
+        <td>${k === "무작위" ? '<span class="tag">기준</span>' : `<span class="tag ${sig ? "no" : "ok"}">${sig ? "차이 있음" : "무작위와 같음"}</span>`}</td></tr>`; }).join("");
+})();
+</script>
+</body>
+</html>

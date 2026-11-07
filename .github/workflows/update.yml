@@ -1,0 +1,53 @@
+name: 로또 데이터 갱신 및 배포
+
+on:
+  schedule:
+    # 추첨은 토요일 20:35 KST. GitHub 예약 실행은 늦어지거나 빠질 수 있어 여러 번 시도 (이미 반영됐으면 아무것도 안 함)
+    - cron: "50 12 * * 6"   # 토 21:50 KST
+    - cron: "30 14 * * 6"   # 토 23:30 KST
+    - cron: "0 1 * * 0"     # 일 10:00 KST
+    - cron: "0 1 * * 1"     # 월 10:00 KST
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 동행복권에서 최신 회차 받기
+        run: python fetch_lotto.py
+      - name: 새 회차가 있으면 저장소에 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lotto645.csv data.js
+          git diff --cached --quiet || { git commit -m "data: 로또 최신 회차 반영"; git push; }
+      - name: 사이트 파일 모으기
+        run: mkdir _site && cp index.html data.js _site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: update
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

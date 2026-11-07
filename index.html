@@ -107,8 +107,8 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     <details style="margin-top:10px"><summary>전략 설명</summary><div id="stratHelp" class="note"></div></details>
   </section>
   <section class="card" id="sajuCard">
-    <h2>내 사주 입력 <span class="tag">사주 전략용</span></h2>
-    <p class="note">사주 전략을 쓸 때만 필요합니다. 입력값은 이 브라우저에만 저장됩니다.</p>
+    <h2>내 정보 입력 <span class="tag">사주·별자리·점성술 전략용</span></h2>
+    <p class="note">사주 오행형·별자리형·점성술형을 쓸 때만 필요합니다. 입력값은 이 브라우저에만 저장됩니다.</p>
     <form id="sajuForm" class="form">
       <label>이름(선택)<input id="sjName" maxlength="20" placeholder="닉네임"></label>
       <fieldset><legend>달력</legend>
@@ -319,8 +319,60 @@ function renderSaju() {
     <p class="note">제${LAST.no + 1}회 추첨일(${drawDate.getMonth() + 1}/${drawDate.getDate()}) 일진은 <b>${gzK(s.draw)}(${s.draw.hanja})</b>입니다.
       부족한 오행일수록, 그리고 일진의 오행(${GAN_OH[s.draw.gan]}·${JI_OH[s.draw.ji]})일수록 가중치를 높였습니다.
       가장 힘을 주는 오행은 <b class="o-${best}">${best}</b>, 끝자리 ${ohDigits(best)}인 번호입니다.</p>
-    <p class="note">오행 가중치: ${OHS.map(o => `${o} ${s.ohW[o]} (끝자리 ${ohDigits(o)})`).join(" · ")}</p>`;
+    <p class="note">오행 가중치: ${OHS.map(o => `${o} ${s.ohW[o]} (끝자리 ${ohDigits(o)})`).join(" · ")}</p>
+    ${renderWest(s.west)}`;
 }
+
+// ---------- 별자리·점성술 ----------
+// [이름, 기호, 시작월, 시작일, 원소, 지배행성 수(칼데아 수비학: 태양1 달2 목성3 수성5 금성6 토성8 화성9)]
+const SIGNS = [["양자리", "♈", 3, 21, "불", 9], ["황소자리", "♉", 4, 20, "흙", 6], ["쌍둥이자리", "♊", 5, 21, "공기", 5], ["게자리", "♋", 6, 22, "물", 2],
+  ["사자자리", "♌", 7, 23, "불", 1], ["처녀자리", "♍", 8, 23, "흙", 5], ["천칭자리", "♎", 9, 23, "공기", 6], ["전갈자리", "♏", 10, 23, "물", 9],
+  ["사수자리", "♐", 11, 23, "불", 3], ["염소자리", "♑", 12, 22, "흙", 8], ["물병자리", "♒", 1, 20, "공기", 8], ["물고기자리", "♓", 2, 19, "물", 3]];
+const PLANET = { 1: "태양", 2: "달", 3: "목성", 5: "수성", 6: "금성", 8: "토성", 9: "화성" };
+const DAY_PLANET = [1, 2, 9, 5, 3, 6, 8]; // 일월화수목금토 요일의 지배행성
+const dr = n => 1 + (n - 1) % 9;           // 수비학 환원 (예: 38 → 3+8=11 → 2)
+function signOf(m, d) {
+  const md = m * 100 + d; let s = 9;      // 1/1~1/19는 염소자리
+  for (const i of [10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) if (md >= SIGNS[i][2] * 100 + SIGNS[i][3]) s = i;
+  return s;
+}
+function moonPhase(date) { // 평균 삭망월로 계산한 월령(일). 오차 ±1일 정도
+  const jd = date.getTime() / 86400000 + 2440587.5, age = (((jd - 2451550.1) / 29.530588853) % 1 + 1) % 1 * 29.530588853;
+  const names = ["신월", "초승달", "상현달", "차오르는 달", "보름달", "기우는 달", "하현달", "그믐달"];
+  return { age, name: names[Math.floor((age / 29.530588853) * 8 + 0.5) % 8] };
+}
+function calcWest(solarYmd) {
+  const [y, m, d] = solarYmd.split("-").map(Number), sign = signOf(m, d), S = SIGNS[sign];
+  const life = dr([...solarYmd.replace(/-/g, "")].reduce((a, c) => a + +c, 0));
+  const wday = DAY_PLANET[new Date(y, m - 1, d).getDay()], dday = DAY_PLANET[drawDate.getDay()];
+  const dsign = signOf(drawDate.getMonth() + 1, drawDate.getDate());
+  const same = i => SIGNS[i][4] === S[4];
+  // 별자리형: 내 별자리 번호(1~12)와 12씩 더한 수 +3, 같은 원소 별자리 번호 +1.5, 추첨일 태양 별자리 번호 +1
+  const zw = Array(46).fill(0);
+  NUMS.forEach(n => { const i = (n - 1) % 12; zw[n] = 1 + (i === sign ? 3 : 0) + (i !== sign && same(i) ? 1.5 : 0) + (i === dsign ? 1 : 0); });
+  // 점성술형: 수비학 환원값이 지배행성 수 +3, 태어난 요일 행성 +2, 생명수 +2, 추첨일 요일 행성 +1
+  const aw = Array(46).fill(0);
+  NUMS.forEach(n => { const r = dr(n); aw[n] = 1 + (r === S[5] ? 3 : 0) + (r === wday ? 2 : 0) + (r === life ? 2 : 0) + (r === dday ? 1 : 0); });
+  return { sign, life, wday, dday, dsign, zw, aw, moon: moonPhase(drawDate) };
+}
+function renderWest(w) {
+  if (!w) return "";
+  const S = SIGNS[w.sign], nums = NUMS.filter(n => (n - 1) % 12 === w.sign);
+  return `<h2 style="margin-top:16px">별자리·점성술</h2>
+    <p class="note" style="color:var(--ink2)"><b>${S[1]} ${S[0]}</b> (${S[4]}의 원소) · 지배행성 ${PLANET[S[5]]}(${S[5]}) · 태어난 요일의 행성 ${PLANET[w.wday]}(${w.wday}) · 생명수 ${w.life}<br>
+    추첨일(${drawDate.getMonth() + 1}/${drawDate.getDate()})은 ${SIGNS[w.dsign][0]} 시기, ${PLANET[w.dday]}의 날, 달은 <b>${w.moon.name}</b>(월령 ${w.moon.age.toFixed(1)}일)</p>
+    <p class="note">별자리형 핵심 번호: ${nums.join(", ")} · 점성술형은 숫자를 한 자리로 줄인 값(예: 38→3+8=11→2)이 ${PLANET[S[5]]} ${S[5]}, ${PLANET[w.wday]} ${w.wday}, 생명수 ${w.life}, ${PLANET[w.dday]} ${w.dday}인 번호를 우대합니다.</p>`;
+}
+
+// ---------- 양자형·마르코프형 ----------
+// 마르코프 전이: 직전 회차 번호 a가 나온 다음 회차에 b가 나온 비율의 합
+const TR = Array.from({ length: 46 }, () => Array(46).fill(0)), OCC = Array(46).fill(0);
+for (let i = 1; i < N; i++) for (const a of D[i - 1].n) { OCC[a]++; for (const b of D[i].n) TR[a][b]++; }
+const markovW = Array(46).fill(0); NUMS.forEach(j => markovW[j] = LAST.n.reduce((s, a) => s + TR[a][j] / OCC[a], 0) ** 4); // 4제곱으로 차이를 키움
+// 양자 확률진폭형 (비유 모델): ψ = √(역대 비율) + √(최근50 비율)·e^{iφ}, φ = π·미출현/7.5 → P ∝ |ψ|² (간섭항 2ab·cosφ)
+const qW = Array(46).fill(0);
+NUMS.forEach(k => { const a = Math.sqrt(freq[k] / (N * 6)), b = Math.sqrt((c50[k] + 0.5) / (300 + 22.5)); qW[k] = a * a + b * b + 2 * a * b * Math.cos(Math.PI * gap(k) / 7.5); });
+const cryptoR = () => { const u = new Uint32Array(1); crypto.getRandomValues(u); return u[0] / 4294967296; }; // 운영체제 하드웨어 엔트로피 난수
 
 // ---------- 전략 ----------
 function pick6(R, w) { // 가중치 w로 비복원 6개 (w 없으면 균등)
@@ -350,8 +402,13 @@ const STRATS = {
     const s = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 45]].map(([a, b]) => a + Math.floor(R() * (b - a + 1)));
     let x; do x = 1 + Math.floor(R() * 45); while (s.includes(x)); return [...s, x].sort((a, b) => a - b); }],
   random: ["무작위 혼합형", "완전 무작위 (형태 필터만 적용)", R => pick6(R)],
+  markov: ["마르코프 전이형", `직전 회차(${LAST.n.join(", ")}) 번호 다음 회차에 자주 나온 번호에 가중치 (GitHub 예측 프로젝트들의 '이전 회차 → 다음 회차' 방식)`, R => pick6(R, markovW)],
+  quantum: ["양자 확률진폭형", "양자역학을 빗댄 모델: 역대 빈도와 최근 빈도를 두 경로의 진폭으로 보고, 미출현 기간을 위상차로 간섭시켜 |ψ|²에 비례해 '측정'. 측정은 운영체제 하드웨어 난수 사용 (실제 양자 난수 아님)", R => pick6(R, qW)],
   saju: ["사주 오행형", "내 사주의 부족한 오행 + 추첨일 일진 오행 번호에 가중치. 같은 사람·같은 회차·같은 순번이면 항상 같은 번호", R => pick6(R, saju.w)],
+  zodiac: ["별자리형", "내 태양 별자리 번호(양자리 1 … 물고기자리 12)와 12씩 더한 수, 같은 원소 별자리 번호, 추첨일 별자리 번호에 가중치", R => pick6(R, saju.west.zw)],
+  astro: ["점성술형", "번호를 한 자리로 줄인 수(수비학)가 내 별자리 지배행성·태어난 요일 행성·생명수·추첨일 행성의 수와 같으면 가중치", R => pick6(R, saju.west.aw)],
 };
+const PROFILE = ["saju", "zodiac", "astro"]; // 내 정보가 필요한 전략
 const SKEYS = Object.keys(STRATS);
 const optHtml = sel => SKEYS.map(k => `<option value="${k}"${k === sel ? " selected" : ""}>${STRATS[k][0]}</option>`).join("");
 $("stratHelp").innerHTML = SKEYS.map(k => `<b>${STRATS[k][0]}</b> — ${STRATS[k][1]}`).join("<br>")
@@ -378,20 +435,23 @@ function generate() {
   const seed = (Math.random() * 2 ** 31) | 0; current = [];
   choice.forEach((k, i) => {
     const [name, , fn] = STRATS[k];
-    if (k === "saju" && !saju) {
-      $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 아래 '내 사주 입력'을 먼저 저장하세요.`; return; }
-    // 사주형은 사람·회차·순번으로 시드를 고정하고 다른 게임과의 겹침 검사도 하지 않음 (항상 같은 결과)
-    const R = rng(k === "saju" ? hashStr(saju.key + i) : seed + i * 7919);
+    const prof = PROFILE.includes(k);
+    if (prof && !saju) {
+      $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 아래 '내 정보 입력'을 먼저 저장하세요.`; return; }
+    // 사주·별자리·점성술형은 사람·회차·전략·순번으로 시드를 고정하고 겹침 검사도 하지 않음 (항상 같은 결과)
+    const R = prof ? rng(hashStr(saju.key + (k === "saju" ? "" : k) + i)) : k === "quantum" ? cryptoR : rng(seed + i * 7919);
     let s, tries = 0;
-    do s = fn(R); while (++tries < 5000 && (!okShape(s) || (k !== "saju" && current.some(c => c.s.filter(x => s.includes(x)).length > 2))));
+    do s = fn(R); while (++tries < 5000 && (!okShape(s) || (!prof && current.some(c => c.s.filter(x => s.includes(x)).length > 2))));
     current.push({ name, s });
     const odd = s.filter(x => x % 2).length;
     $("res" + i).innerHTML = s.map(ball).join("");
     $("why" + i).innerHTML = `<b>${name}</b> · 합 ${s.reduce((a, b) => a + b, 0)} · 홀짝 ${odd}:${6 - odd}`
-      + (k === "saju" ? ` · 오행 ${s.map(numOh).join("")}` : "");
+      + (k === "saju" ? ` · 오행 ${s.map(numOh).join("")}` : "")
+      + (k === "astro" ? ` · 수비 ${s.map(dr).join("")}` : "")
+      + (k === "zodiac" ? ` · 별자리 ${s.map(x => SIGNS[(x - 1) % 12][1]).join("")}` : "");
   });
   $("copy").disabled = !current.length;
-  if (choice.includes("saju") && !saju) $("sjY").focus();
+  if (choice.some(k => PROFILE.includes(k)) && !saju) $("sjY").focus();
 }
 $("again").onclick = generate;
 $("copy").onclick = async () => {
@@ -407,7 +467,7 @@ $("sjMi").innerHTML = Array.from({ length: 60 }, (_, m) => `<option value="${m}"
 const readForm = () => ({ name: $("sjName").value.trim(), cal: document.querySelector("input[name=cal]:checked").value,
   leap: $("sjLeap").checked, y: +$("sjY").value, m: +$("sjM").value, d: +$("sjD").value, h: $("sjH").value, mi: $("sjMi").value });
 function applyProfile(p, save) {
-  try { saju = calcSaju(p); renderSaju(); $("sjMsg").textContent = save ? "저장했어요" : "";
+  try { saju = calcSaju(p); saju.west = calcWest(saju.solar); renderSaju(); $("sjMsg").textContent = save ? "저장했어요" : "";
     if (save) try { localStorage.setItem("lottoSaju", JSON.stringify(p)); } catch {} }
   catch (e) { saju = null; renderSaju(); $("sjMsg").textContent = e.message; }
 }
@@ -428,8 +488,11 @@ try {
     "전체 빈도": (h) => split5(top(f)),
     "최근 50회 빈도": (h) => { const c = Array(46).fill(0); h.slice(-50).forEach(d => d.n.forEach(x => c[x]++)); return split5(top(c)); },
     "장기 미출현": (h) => split5(top(l, true)),
+    "마르코프 전이": (h) => { const prev = h[h.length - 1].n, sc = Array(46).fill(0);
+      NUMS.forEach(j => sc[j] = prev.reduce((s, a) => s + (mo[a] ? mt[a][j] / mo[a] : 0), 0)); return split5(top(sc)); },
     "무작위": () => [0, 1, 2, 3, 4].map(() => pick6(R)),
   };
+  const mt = Array.from({ length: 46 }, () => Array(46).fill(0)), mo = Array(46).fill(0);
   const res = Object.fromEntries(Object.keys(models).map(k => [k, { hit: 0, h3: 0, h4: 0, n: 0 }]));
   D.forEach((d, i) => {
     if (d.no >= START) {
@@ -438,12 +501,13 @@ try {
         const h = s.filter(x => win.has(x)).length; const r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4; }
     }
     d.n.forEach(x => { f[x]++; l[x] = d.no; }); // 예측이 끝난 뒤에야 이 회차를 학습
+    if (i) for (const a of D[i - 1].n) { mo[a]++; for (const b of d.n) mt[a][b]++; }
   });
   const MU = 0.8, VAR = 0.8 * (39 / 45) * (39 / 44), P3 = [3, 4, 5, 6].reduce((s, k) => s + C(6, k) * C(39, 6 - k), 0) / C(45, 6);
   $("btTxt").innerHTML = `제${START}회~제${LAST.no}회 ${N - START + 1}회를, 매 회차 <b>그 이전 데이터만</b> 보고 5게임씩 뽑아 실제 결과와 맞춰 봤습니다.
-    무작위 기준: 게임당 평균 0.800개 일치, 3개 이상 ${(P3 * 100).toFixed(2)}%. 전략을 3개 비교하므로 |z| &gt; 2.39여야 유의합니다.`;
+    무작위 기준: 게임당 평균 0.800개 일치, 3개 이상 ${(P3 * 100).toFixed(2)}%. 전략을 4개 비교하므로 |z| &gt; 2.50이어야 유의합니다.`;
   $("bt").innerHTML = "<tr><th>전략</th><th>평균 일치</th><th>3개+</th><th>4개+</th><th>z</th><th>판정</th></tr>"
-    + Object.entries(res).map(([k, r]) => { const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n), sig = k !== "무작위" && Math.abs(z) > 2.39;
+    + Object.entries(res).map(([k, r]) => { const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n), sig = k !== "무작위" && Math.abs(z) > 2.50;
       return `<tr><td>${k}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${z >= 0 ? "+" : ""}${z.toFixed(2)}</td>
         <td>${k === "무작위" ? '<span class="tag">기준</span>' : `<span class="tag ${sig ? "no" : "ok"}">${sig ? "차이 있음" : "무작위와 같음"}</span>`}</td></tr>`; }).join("");
 })();

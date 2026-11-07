@@ -200,7 +200,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     <ul>
       <li><b>통계형</b> — 역대·최근 출현 빈도, 오래 안 나온 번호, 번호 구간을 고르게.</li>
       <li><b>AI·모델형</b> — 딥러닝(LSTM), 마르코프 전이, 양자 확률진폭(비유 모델).</li>
-      <li><b>동양 역학형</b> — 만세력형(이번 추첨 시각의 사주, 입력 필요 없음), 사주 오행형(내 사주, <b>사주 입력 필수</b>), 유명인사주형(유명인·세계 부자 사주를 추첨일 토요일 운세 점수로 채점해 1게임=1위, 2게임=2위 …식으로 배정, 입력 필요 없음).</li>
+      <li><b>동양 역학형</b> — 만세력형(이번 추첨 시각의 사주, 입력 필요 없음), 사주 오행형(내 사주, <b>사주 입력 필수</b>), 유명인사주형(유명인·세계 부자 사주를 추첨일 토요일 운세 점수로 채점해 1게임=1위 … 10게임=10위 순서대로 배정, 입력 필요 없음).</li>
       <li><b>서양 점성형</b> — 별자리형, 점성술형 (둘 다 <b>사주 입력 필수</b>).</li>
       <li><b>무작위</b> — 완전 무작위.</li>
     </ul>
@@ -597,24 +597,27 @@ function celebScore(c, draw) { // c: {cnt, dmGan, dmJi}, draw: dayGZ 결과 → 
   return { g, wealth, grade: g >= 4 ? "대길" : g >= 2 ? "길" : g >= -1 ? "평" : g >= -3 ? "흉" : "대흉", sg, bg, rel };
 }
 let celebData;
-function celebList() { // CELEBS(유명인·세계 부자 TOP10) 사주의 일간·일지·오행 개수를 한 번만 계산해 캐시
+function celebList() { // CELEBS(유명인·세계 부자 TOP10) 사주의 일간·일지·오행 개수를 한 번만 계산해 캐시 (이름 중복 제거)
   if (celebData !== undefined) return celebData;
   celebData = [];
-  if (window.Solar && window.Lunar) celebData = CELEBS.map(c => { try {
-    const s = calcSaju(toP(c));
-    return { name: c[1], cnt: s.cnt, dmGan: s.pillars[2].gan, dmJi: s.pillars[2].ji };
-  } catch { return null; } }).filter(Boolean);
+  if (window.Solar && window.Lunar) {
+    const seen = new Set();
+    celebData = CELEBS.map(c => { try {
+      const s = calcSaju(toP(c));
+      return { name: c[1], cnt: s.cnt, dmGan: s.pillars[2].gan, dmJi: s.pillars[2].ji };
+    } catch { return null; } }).filter(Boolean)
+      .filter(c => { const k = c.name.replace(/^\d+\.\s*/, ""); if (seen.has(k)) return false; seen.add(k); return true; });
+  }
   return celebData;
 }
-function celebBlendAt(date) { // 유명인 전원을 그 날짜 운세 점수로 채점 → 상위 5명 사주 가중치를 5:4:3:2:1로 합성
+function celebBlendAt(date) { // 유명인 전원을 그 날짜 운세 점수로 채점 → 상위 10명 순위표 (게임 순서대로 1명씩 배정)
   const list = celebList();
   if (!list.length) return null;
   const draw = dayGZ(date);
-  const scored = list.map(c => ({ name: c.name, c, r: celebScore(c, draw) }))
-    .sort((a, b) => (b.r.g + b.r.wealth) - (a.r.g + a.r.wealth) || b.r.g - a.r.g || (a.name < b.name ? -1 : 1));
-  const w = Array(46).fill(0), top = scored.slice(0, 5);
-  top.forEach((t, i) => { const ww = ohWeights(t.c.cnt, draw).w, k = 5 - i; for (let n = 1; n <= 45; n++) w[n] += k * ww[n]; });
-  return { w, top, draw };
+  const top = list.map(c => ({ name: c.name, c, r: celebScore(c, draw) }))
+    .sort((a, b) => (b.r.g + b.r.wealth) - (a.r.g + a.r.wealth) || b.r.g - a.r.g || (a.name < b.name ? -1 : 1))
+    .slice(0, 10);
+  return { top, draw };
 }
 function celebPlan() { // 이번 추첨일(토요일) 기준 — 같은 주면 항상 같은 결과
   if (celebCache !== undefined) return celebCache;
@@ -811,10 +814,10 @@ function manseAt(date) {
 }
 STRATS.manse = ["만세력형", "내 정보 없이, 이번 추첨 시각(토 20:35)의 년·월·일·시 4기둥을 만세력으로 뽑아, 그 시각에 강한 오행의 번호(끝자리 하도 수리)와 각 기둥의 60갑자 순번 번호에 가중치. 그 주에는 누구에게나 같은 번호",
   (R, c = LIVE) => pick6(R, c.manseW)];
-// 유명인사주형: 유명인 전원을 추첨일(토요일) 기준 SAJOO식 운세 점수로 채점, 게임 순서대로 상위 명 배정
-STRATS.celeb = ["유명인사주형", "아래 유명인·세계 부자 TOP10 사주를 추첨일 토요일 기준 오늘의 운세 점수로 채점합니다 (SAJOO 방식: 일간 기준 일진 십신 + 지지 육합·삼합·충 + 오행 생극 + 용신운 + 천간합). 1게임은 운세 1위, 2게임은 2위 …식으로 게임 순서의 유명인 사주 오행 가중치로 뽑습니다 (6게임 이상이면 1위부터 반복). 같은 주에는 같은 결과. 운세 점수는 1등 확률과 무관",
+// 유명인사주형: 유명인 전원을 추첨일(토요일) 기준 SAJOO식 운세 점수로 채점, 게임 순서대로 상위 명 배정 (10게임 = 1~10위)
+STRATS.celeb = ["유명인사주형", "아래 유명인·세계 부자 TOP10 사주를 추첨일 토요일 기준 오늘의 운세 점수로 채점합니다 (SAJOO 방식: 일간 기준 일진 십신 + 지지 육합·삼합·충 + 오행 생극 + 용신운 + 천간합). 1게임은 운세 1위, 2게임은 2위 … 10게임은 10위 — 게임 순서의 유명인 사주 오행 가중치로 뽑습니다 (반복 없음). 같은 주에는 같은 결과. 운세 점수는 1등 확률과 무관",
   (R, c = LIVE, gi = 0) => { const p = c.celebPlan; if (!p || !p.top.length) return pick6(R);
-    const t = p.top[gi % p.top.length]; return pick6(R, ohWeights(t.c.cnt, p.draw).w); }];
+    const t = p.top[Math.min(gi, p.top.length - 1)]; return pick6(R, ohWeights(t.c.cnt, p.draw).w); }];
 // 실시간 추천에 쓰는 기준값 (백테스트는 회차마다 그 시점까지의 값으로 같은 함수를 부름)
 const LIVE = { qlo: q(0.1), qhi: q(0.9), prev: LAST.n, pastSet, freq, c50, overdue, markovW, qW,
   get sajuW() { return saju.w; }, get zw() { return saju.west.zw; }, get aw() { return saju.west.aw; }, get manseW() { return manse().w; },
@@ -923,8 +926,8 @@ function generate() {
       + (k === "astro" ? ` · 수비 ${s.map(dr).join("")}` : "")
       + (k === "zodiac" ? ` · 별자리 ${s.map(x => SIGNS[(x - 1) % 12][1]).join("")}` : "")
       + (k === "manse" ? ` · 추첨 시각 ${manse().pil.map(x => gzK(x) + x.name).join(" ")}` : "")
-      + (k === "celeb" ? (() => { const p = celebPlan(), t = p.top[i % p.top.length];
-          return ` · ${drawDate.getMonth() + 1}/${drawDate.getDate()} 토요일 운세 ${(i % p.top.length) + 1}위 ${t.name}(${t.r.grade}, 재물+${t.r.wealth}) 사주로 뽑음`; })() : "");
+      + (k === "celeb" ? (() => { const p = celebPlan(), t = p.top[Math.min(i, p.top.length - 1)];
+          return ` · ${drawDate.getMonth() + 1}/${drawDate.getDate()} 토요일 운세 ${Math.min(i, p.top.length - 1) + 1}위 ${t.name}(${t.r.grade}, 재물+${t.r.wealth}) 사주로 뽑음`; })() : "");
   });
   $("copy").disabled = !current.length;
   if (choice.some(k => PROFILE.includes(k)) && !saju) $("sjY").focus();

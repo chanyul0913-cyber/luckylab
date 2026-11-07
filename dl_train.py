@@ -82,7 +82,13 @@ print(f"홀드아웃 {cut + 1}~{N}회: 평균 일치 {mean:.3f} (무작위 0.800
 
 # 2) 전체로 학습 -> 다음 회차
 p = predict(train(N), N)
-res = {"last": N, "p": [round(float(v), 5) for v in p], "hit": hit, "n": n, "h3": h3, "h4": h4,
+# 지난 예측 보관: 기존 dl.js가 바로 이번에 들어온 회차(N)를 예측했던 것이면 '예측 vs 실제' 비교용으로 남김
+prev = None
+if os.path.exists(OUT):
+    with open(OUT, encoding="utf-8") as f:
+        old = json.loads(f.read().split("=", 1)[1].rstrip().rstrip(";"))
+    prev = {"no": N, "p": old["p"]} if old["last"] + 1 == N else old.get("prev")
+res = {"last": N, "p": [round(float(v), 5) for v in p], "hit": hit, "n": n, "h3": h3, "h4": h4, "prev": prev,
        "model": f"LSTM({UNITS}) 창 {W}회, {EPOCHS} epoch, PyTorch {torch.__version__}", "trained": date.today().isoformat()}
 with open(OUT, "w", encoding="utf-8") as f:
     f.write("window.LOTTO_DL=" + json.dumps(res, ensure_ascii=False, separators=(",", ":")) + ";\n")

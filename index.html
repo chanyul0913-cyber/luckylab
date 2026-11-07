@@ -315,6 +315,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
   <section class="card">
     <h2>백테스트 — 이 전략들이 실제로 맞췄나</h2>
     <p class="note" id="btTxt"></p>
+    <p class="note" id="btProg"></p>
     <table id="bt"></table>
     <div id="dlEval"><p class="note" style="margin-top:12px">딥러닝 결과를 준비 중입니다.</p></div>
   </section>
@@ -524,13 +525,18 @@ function calcSaju(p) {
   const pillars = raw.map((s, i) => s && { name: names[i], gan: GAN.indexOf(s[0]), ji: JI.indexOf(s[1]), hanja: s });
   const cnt = Object.fromEntries(OHS.map(o => [o, 0]));
   pillars.forEach(x => { if (x) { cnt[GAN_OH[x.gan]]++; cnt[JI_OH[x.ji]]++; } });
-  const dz = Solar.fromDate(drawDate).getLunar().getDayInGanZhi();
+  const { draw, ohW, w } = sajuWeightsAt(cnt, drawDate);
+  const key = raw.join("") + drawDate.toDateString();
+  return { name: p.name, pillars, cnt, draw, ohW, w, key, known, solar: solar.toYmd(), cal: p.cal };
+}
+// 내 사주 오행 개수 + 그 추첨일의 일진 → 번호 가중치 (백테스트에서도 과거 추첨일마다 사용)
+function sajuWeightsAt(cnt, date) {
+  const dz = Solar.fromDate(date).getLunar().getDayInGanZhi();
   const draw = { gan: GAN.indexOf(dz[0]), ji: JI.indexOf(dz[1]), hanja: dz };
   const mx = Math.max(...Object.values(cnt));
   const ohW = Object.fromEntries(OHS.map(o => [o, (mx - cnt[o]) + 1 + (o === GAN_OH[draw.gan] ? 2 : 0) + (o === JI_OH[draw.ji] ? 1 : 0)]));
   const w = Array(46).fill(0); NUMS.forEach(n => w[n] = ohW[numOh(n)]);
-  const key = raw.join("") + drawDate.toDateString();
-  return { name: p.name, pillars, cnt, draw, ohW, w, key, known, solar: solar.toYmd(), cal: p.cal };
+  return { draw, ohW, w };
 }
 const gzK = x => GAN_K[x.gan] + JI_K[x.ji];
 function renderSaju() {
@@ -572,8 +578,11 @@ function moonPhase(date) { // 평균 삭망월로 계산한 월령(일). 오차 
 function calcWest(solarYmd) {
   const [y, m, d] = solarYmd.split("-").map(Number), sign = signOf(m, d), S = SIGNS[sign];
   const life = dr([...solarYmd.replace(/-/g, "")].reduce((a, c) => a + +c, 0));
-  const wday = DAY_PLANET[new Date(y, m - 1, d).getDay()], dday = DAY_PLANET[drawDate.getDay()];
-  const dsign = signOf(drawDate.getMonth() + 1, drawDate.getDate());
+  const wday = DAY_PLANET[new Date(y, m - 1, d).getDay()];
+  return { sign, life, wday, ...westWeightsAt(sign, life, wday, drawDate), moon: moonPhase(drawDate) };
+}
+function westWeightsAt(sign, life, wday, date) {
+  const S = SIGNS[sign], dday = DAY_PLANET[date.getDay()], dsign = signOf(date.getMonth() + 1, date.getDate());
   const same = i => SIGNS[i][4] === S[4];
   // 별자리형: 내 별자리 번호(1~12)와 12씩 더한 수 +3, 같은 원소 별자리 번호 +1.5, 추첨일 태양 별자리 번호 +1
   const zw = Array(46).fill(0);
@@ -581,7 +590,7 @@ function calcWest(solarYmd) {
   // 점성술형: 수비학 환원값이 지배행성 수 +3, 태어난 요일 행성 +2, 생명수 +2, 추첨일 요일 행성 +1
   const aw = Array(46).fill(0);
   NUMS.forEach(n => { const r = dr(n); aw[n] = 1 + (r === S[5] ? 3 : 0) + (r === wday ? 2 : 0) + (r === life ? 2 : 0) + (r === dday ? 1 : 0); });
-  return { sign, life, wday, dday, dsign, zw, aw, moon: moonPhase(drawDate) };
+  return { dday, dsign, zw, aw };
 }
 function renderWest(w) {
   if (!w) return "";
@@ -596,10 +605,15 @@ function renderWest(w) {
 // 마르코프 전이: 직전 회차 번호 a가 나온 다음 회차에 b가 나온 비율의 합
 const TR = Array.from({ length: 46 }, () => Array(46).fill(0)), OCC = Array(46).fill(0);
 for (let i = 1; i < N; i++) for (const a of D[i - 1].n) { OCC[a]++; for (const b of D[i].n) TR[a][b]++; }
-const markovW = Array(46).fill(0); NUMS.forEach(j => markovW[j] = LAST.n.reduce((s, a) => s + TR[a][j] / OCC[a], 0) ** 4); // 4제곱으로 차이를 키움
+const markovWeights = (tr, occ, prev) => { const w = Array(46).fill(0); NUMS.forEach(j => w[j] = prev.reduce((s, a) => s + (occ[a] ? tr[a][j] / occ[a] : 0), 0) ** 4); return w; }; // 4제곱으로 차이를 키움
+const markovW = markovWeights(TR, OCC, LAST.n);
 // 양자 확률진폭형 (비유 모델): ψ = √(역대 비율) + √(최근50 비율)·e^{iφ}, φ = π·미출현/7.5 → P ∝ |ψ|² (간섭항 2ab·cosφ)
-const qW = Array(46).fill(0);
-NUMS.forEach(k => { const a = Math.sqrt(freq[k] / (N * 6)), b = Math.sqrt((c50[k] + 0.5) / (300 + 22.5)); qW[k] = a * a + b * b + 2 * a * b * Math.cos(Math.PI * gap(k) / 7.5); });
+function quantumWeights(fr, c5, gp, n) {
+  const w = Array(46).fill(0);
+  NUMS.forEach(k => { const a = Math.sqrt(fr[k] / (n * 6)), b = Math.sqrt((c5[k] + 0.5) / (300 + 22.5)); w[k] = a * a + b * b + 2 * a * b * Math.cos(Math.PI * gp(k) / 7.5); });
+  return w;
+}
+const qW = quantumWeights(freq, c50, gap, N);
 // ---------- 딥러닝(LSTM) ----------
 // 학습은 GitHub Actions에서 매주 dl_train.py(PyTorch)로 하고, 페이지는 결과(dl.js)만 읽음
 const dl = window.LOTTO_DL && window.LOTTO_DL.last === N ? window.LOTTO_DL : null;
@@ -624,13 +638,13 @@ function pick6(R, w) { // 가중치 w로 비복원 6개 (w 없으면 균등)
   return out.sort((a, b) => a - b);
 }
 // 사람들이 몰리는 조합 회피 + 역대 형태 범위
-function okShape(s) {
+function okShape(s, c = LIVE) {
   if (s.length !== 6 || new Set(s).size !== 6) return false;           // 안전장치: 서로 다른 6개
   if (s.filter(x => x >= 32).length < 2) return false;                 // 생일(1~31)만의 조합 회피
   if (s.some((x, i) => i >= 2 && x - s[i - 1] === 1 && s[i - 1] - s[i - 2] === 1)) return false; // 3연속
   const d = s[1] - s[0]; if (s.every((x, i) => !i || x - s[i - 1] === d)) return false;       // 등차수열
   if (new Set(s.map(x => Math.min(4, (x - 1) / 10 | 0))).size < 3) return false;               // 한 구간 몰림
-  const sm = s.reduce((a, b) => a + b, 0); if (sm < q(0.1) || sm > q(0.9)) return false;
+  const sm = s.reduce((a, b) => a + b, 0); if (sm < c.qlo || sm > c.qhi) return false;
   // 사용자 지정 제외 규칙
   const pr = s.filter(x => PRIMES.has(x)).length;
   if (pr === 0 || pr >= 5) return false;                                // 소수 0개 또는 5개 이상
@@ -643,17 +657,18 @@ function okShape(s) {
   if (Math.max(...Object.values(colc)) >= 4) return false;              // 용지 세로줄 최대 개수 4개 이상
   if (s.filter(x => x % 3 === 0).length >= 5) return false;             // 3의 배수 5개 이상
   if (s.filter(x => x % 5 === 0).length >= 4) return false;             // 5의 배수 4개 이상
-  if (s.filter(x => LAST.n.includes(x)).length >= 3) return false;      // 이월수(직전 회차 번호) 3개 이상
-  return !pastSet.has(s.join(","));                                    // 역대 1등 조합 그대로 회피
+  if (s.filter(x => c.prev.includes(x)).length >= 3) return false;      // 이월수(직전 회차 번호) 3개 이상
+  return !c.pastSet.has(s.join(","));                                  // 역대 1등 조합 그대로 회피
 }
 const PRIMES = new Set([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43]);
-const overdue = [...NUMS].sort((a, b) => gap(b) - gap(a)).slice(0, 5);
+const overdueOf = gp => [...NUMS].sort((a, b) => gp(b) - gp(a) || a - b).slice(0, 5);
+const overdue = overdueOf(gap);
 const STRATS = {
-  balance: ["전체 통계 균형형", "역대 출현 빈도를 가중치로 사용", R => pick6(R, freq)],
-  recent: ["최근 50회 참고형", "최근 50회 출현 횟수 + 1을 가중치로 사용", R => pick6(R, c50.map(v => v + 1))],
-  overdue: ["미출현 포함형", `장기 미출현 상위 5개(${overdue.join(", ")}) 중 2개 + 나머지 무작위`, R => {
-    const o = overdue.slice().sort(() => R() - .5).slice(0, 2);
-    const pool = NUMS.filter(x => !overdue.includes(x)), a = []; // 나머지 4개는 미출현 상위 5개를 뺀 40개에서
+  balance: ["전체 통계 균형형", "역대 출현 빈도를 가중치로 사용", (R, c = LIVE) => pick6(R, c.freq)],
+  recent: ["최근 50회 참고형", "최근 50회 출현 횟수 + 1을 가중치로 사용", (R, c = LIVE) => pick6(R, c.c50.map(v => v + 1))],
+  overdue: ["미출현 포함형", `장기 미출현 상위 5개(${overdue.join(", ")}) 중 2개 + 나머지 무작위`, (R, c = LIVE) => {
+    const o = c.overdue.slice().sort(() => R() - .5).slice(0, 2);
+    const pool = NUMS.filter(x => !c.overdue.includes(x)), a = []; // 나머지 4개는 미출현 상위 5개를 뺀 40개에서
     while (a.length < 4) a.push(pool.splice(Math.floor(R() * pool.length), 1)[0]);
     return [...o, ...a].sort((x, y) => x - y); }],
   spread: ["구간 분산형", "1-10·11-20·21-30·31-40·41-45 다섯 구간 중 4곳을 골라 하나씩 + 같은 4구간에서 2개 더 (공 색상 4가지)", R => {
@@ -663,21 +678,24 @@ const STRATS = {
     while (s.length < 6) s.push(pool.splice(Math.floor(R() * pool.length), 1)[0]);
     return s.sort((a, b) => a - b); }],
   random: ["무작위 혼합형", "완전 무작위 (형태 필터만 적용)", R => pick6(R)],
-  markov: ["마르코프 전이형", `직전 회차(${LAST.n.join(", ")}) 번호 다음 회차에 자주 나온 번호에 가중치 (GitHub 예측 프로젝트들의 '이전 회차 → 다음 회차' 방식)`, R => pick6(R, markovW)],
-  quantum: ["양자 확률진폭형", "양자역학을 빗댄 모델: 역대 빈도와 최근 빈도를 두 경로의 진폭으로 보고, 미출현 기간을 위상차로 간섭시켜 |ψ|²에 비례해 '측정'. 측정은 운영체제 하드웨어 난수 사용 (실제 양자 난수 아님)", R => pick6(R, qW)],
+  markov: ["마르코프 전이형", `직전 회차(${LAST.n.join(", ")}) 번호 다음 회차에 자주 나온 번호에 가중치 (GitHub 예측 프로젝트들의 '이전 회차 → 다음 회차' 방식)`, (R, c = LIVE) => pick6(R, c.markovW)],
+  quantum: ["양자 확률진폭형", "양자역학을 빗댄 모델: 역대 빈도와 최근 빈도를 두 경로의 진폭으로 보고, 미출현 기간을 위상차로 간섭시켜 |ψ|²에 비례해 '측정'. 측정은 운영체제 하드웨어 난수 사용 (실제 양자 난수 아님)", (R, c = LIVE) => pick6(R, c.qW)],
   deep: ["딥러닝 LSTM형", "GitHub 인기 예측 프로젝트(LotteryAi 등)와 같은 방식: 직전 10회를 보고 다음 회차를 예측하는 LSTM 신경망을 매주 GitHub 서버에서 학습해 둔 예측 확률로 가중치",
     R => { const avg = dl.p.reduce((a, b) => a + b, 0) / 45; return pick6(R, [0, ...dl.p.map(v => (v / avg) ** 4)]); }],
-  saju: ["사주 오행형", "내 사주의 부족한 오행 + 추첨일 일진 오행 번호에 가중치. 같은 사람·같은 회차·같은 순번이면 항상 같은 번호", R => pick6(R, saju.w)],
-  zodiac: ["별자리형", "내 태양 별자리 번호(양자리 1 … 물고기자리 12)와 12씩 더한 수, 같은 원소 별자리 번호, 추첨일 별자리 번호에 가중치", R => pick6(R, saju.west.zw)],
-  astro: ["점성술형", "번호를 한 자리로 줄인 수(수비학)가 내 별자리 지배행성·태어난 요일 행성·생명수·추첨일 행성의 수와 같으면 가중치", R => pick6(R, saju.west.aw)],
+  saju: ["사주 오행형", "내 사주의 부족한 오행 + 추첨일 일진 오행 번호에 가중치. 같은 사람·같은 회차·같은 순번이면 항상 같은 번호", (R, c = LIVE) => pick6(R, c.sajuW)],
+  zodiac: ["별자리형", "내 태양 별자리 번호(양자리 1 … 물고기자리 12)와 12씩 더한 수, 같은 원소 별자리 번호, 추첨일 별자리 번호에 가중치", (R, c = LIVE) => pick6(R, c.zw)],
+  astro: ["점성술형", "번호를 한 자리로 줄인 수(수비학)가 내 별자리 지배행성·태어난 요일 행성·생명수·추첨일 행성의 수와 같으면 가중치", (R, c = LIVE) => pick6(R, c.aw)],
 };
 // 만세력형: 내 정보 없이, 이번 추첨 시각(토 20:35)의 사주 8글자로 번호를 정함 → 그 주에는 누구에게나 같은 번호
 let manseCache;
 function manse() {
   if (manseCache !== undefined) return manseCache;
   if (!window.Solar) return null; // 라이브러리 로딩 실패 시 다음에 다시 시도
+  return manseCache = manseAt(drawDate);
+}
+function manseAt(date) {
   // 서울 경도 보정 30분: 20:35 → 20:05 (술시)
-  const t = new Date(drawDate.getFullYear(), drawDate.getMonth(), drawDate.getDate(), 20, 5);
+  const t = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 20, 5);
   const ec = Solar.fromDate(t).getLunar().getEightChar();
   const pil = [ec.getYear(), ec.getMonth(), ec.getDay(), ec.getTime()].map((s, i) => ({ name: ["년", "월", "일", "시"][i], gan: GAN.indexOf(s[0]), ji: JI.indexOf(s[1]), hanja: s }));
   const cnt = Object.fromEntries(OHS.map(o => [o, 0]));
@@ -687,10 +705,13 @@ function manse() {
   const key = pil.map(x => x.hanja).join("");
   const nums = [...new Set(pil.map(x => { const v = gz(x); return v > 45 ? v - 45 : v; }))];
   const w = Array(46).fill(0); NUMS.forEach(n => w[n] = 1 + cnt[numOh(n)] + (nums.includes(n) ? 3 : 0)); // 강한 기운을 따름
-  return manseCache = { pil, cnt, nums, w, key };
+  return { pil, cnt, nums, w, key };
 }
 STRATS.manse = ["만세력형", "내 정보 없이, 이번 추첨 시각(토 20:35)의 년·월·일·시 4기둥을 만세력으로 뽑아, 그 시각에 강한 오행의 번호(끝자리 하도 수리)와 각 기둥의 60갑자 순번 번호에 가중치. 그 주에는 누구에게나 같은 번호",
-  R => pick6(R, manse().w)];
+  (R, c = LIVE) => pick6(R, c.manseW)];
+// 실시간 추천에 쓰는 기준값 (백테스트는 회차마다 그 시점까지의 값으로 같은 함수를 부름)
+const LIVE = { qlo: q(0.1), qhi: q(0.9), prev: LAST.n, pastSet, freq, c50, overdue, markovW, qW,
+  get sajuW() { return saju.w; }, get zw() { return saju.west.zw; }, get aw() { return saju.west.aw; }, get manseW() { return manse().w; } };
 const PROFILE = ["saju", "zodiac", "astro"]; // 내 정보가 필요한 전략
 const FIXED = [...PROFILE, "manse"];        // 같은 조건이면 항상 같은 번호가 나오는 전략
 const SKEYS = Object.keys(STRATS);
@@ -793,6 +814,7 @@ const readForm = () => ({ name: $("sjName").value.trim(), cal: document.querySel
   leap: $("sjLeap").checked, y: +$("sjY").value, m: +$("sjM").value, d: +$("sjD").value, h: $("sjH").value, mi: $("sjMi").value });
 function applyProfile(p, save) {
   try { saju = calcSaju(p); saju.west = calcWest(saju.solar); renderSaju(); $("sjMsg").textContent = save ? "저장했어요" : "";
+    if (window.btReady) { renderBT(); backtestProfile(); } // 백테스트 준비 전(페이지 로딩 중)에는 건너뜀
     if (save) try { localStorage.setItem("lottoSaju", JSON.stringify(p)); } catch {} }
   catch (e) { saju = null; renderSaju(); $("sjMsg").textContent = e.message; }
 }
@@ -912,37 +934,85 @@ renderPresets();
 if (dl) renderDL();
 
 // ---------- 백테스트 (각 회차는 직전 회차까지만 사용) ----------
-(function backtest() {
-  const START = 101, f = Array(46).fill(0), l = Array(46).fill(0), R = rng(12345);
-  const top = (score, asc) => NUMS.slice().sort((a, b) => asc ? score[a] - score[b] || a - b : score[b] - score[a] || a - b);
-  const split5 = o => [0, 1, 2, 3, 4].map(i => [0, 1, 2, 3, 4, 5].map(j => o[i + j * 5])); // 상위 30개를 겹치지 않게 5세트
-  const models = {
-    "전체 빈도": (h) => split5(top(f)),
-    "최근 50회 빈도": (h) => { const c = Array(46).fill(0); h.slice(-50).forEach(d => d.n.forEach(x => c[x]++)); return split5(top(c)); },
-    "장기 미출현": (h) => split5(top(l, true)),
-    "마르코프 전이": (h) => { const prev = h[h.length - 1].n, sc = Array(46).fill(0);
-      NUMS.forEach(j => sc[j] = prev.reduce((s, a) => s + (mo[a] ? mt[a][j] / mo[a] : 0), 0)); return split5(top(sc)); },
-    "무작위": () => [0, 1, 2, 3, 4].map(() => pick6(R)),
-  };
-  const mt = Array.from({ length: 46 }, () => Array(46).fill(0)), mo = Array(46).fill(0);
-  const res = Object.fromEntries(Object.keys(models).map(k => [k, { hit: 0, h3: 0, h4: 0, n: 0 }]));
-  D.forEach((d, i) => {
-    if (d.no >= START) {
-      const win = new Set(d.n), hist = D.slice(0, i);
-      for (const [k, fn] of Object.entries(models)) for (const s of fn(hist)) {
-        const h = s.filter(x => win.has(x)).length; const r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4; }
+// 실제 추천과 같은 전략 함수·같은 형태 필터를, 회차마다 그 이전 데이터로 만든 기준값으로 돌림 (미래 데이터 차단)
+const BT_START = 101, BT = {};
+const drawDay = d => new Date(+d.ymd.slice(0, 4), +d.ymd.slice(4, 6) - 1, +d.ymd.slice(6), 12);
+function runBacktest(keys, done) {
+  const res = Object.fromEntries(keys.map(k => [k, { hit: 0, h3: 0, h4: 0, n: 0 }]));
+  const fr = Array(46).fill(0), ls = Array(46).fill(0), tr = Array.from({ length: 46 }, () => Array(46).fill(0)), oc = Array(46).fill(0);
+  const sumsH = [], past = new Set();
+  let i = 0;
+  function step() {
+    const until = Math.min(N, i + 60), t0 = performance.now();
+    for (; i < until; i++) {
+      const d = D[i];
+      if (d.no >= BT_START) {
+        const no = d.no, gp = k => (no - 1) - ls[k], c50h = Array(46).fill(0);
+        D.slice(Math.max(0, i - 50), i).forEach(x => x.n.forEach(v => c50h[v]++));
+        const ctx = { qlo: sumsH[Math.floor(0.1 * (sumsH.length - 1))], qhi: sumsH[Math.floor(0.9 * (sumsH.length - 1))],
+          prev: D[i - 1].n, pastSet: past, freq: fr, c50: c50h, overdue: overdueOf(gp),
+          get markovW() { return markovWeights(tr, oc, D[i - 1].n); }, get qW() { return quantumWeights(fr, c50h, gp, i); },
+          get manseW() { return manseAt(drawDay(d)).w; },
+          get sajuW() { return sajuWeightsAt(saju.cnt, drawDay(d)).w; },
+          get zw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).zw; },
+          get aw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).aw; } };
+        const win = new Set(d.n);
+        for (const k of keys) {
+          const fn = STRATS[k][2], R = rng(no * 7919 + hashStr(k)), cx = Object.create(ctx);
+          for (const key of ["markovW", "qW", "manseW", "sajuW", "zw", "aw"]) { let v; Object.defineProperty(cx, key, { get: () => v ??= ctx[key] }); } // 회차당 한 번만 계산
+          for (let g = 0; g < 5; g++) {
+            let s, tries = 0;
+            do s = fn(R, cx); while (++tries < 500 && !okShape(s, cx));
+            const h = s.filter(x => win.has(x)).length, r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4;
+          }
+        }
+      }
+      // 예측이 끝난 뒤에야 이 회차를 학습 데이터에 넣음
+      d.n.forEach(x => { fr[x]++; ls[x] = d.no; });
+      if (i) for (const a of D[i - 1].n) { oc[a]++; for (const b of d.n) tr[a][b]++; }
+      const sm = d.n.reduce((a, b) => a + b, 0); sumsH.splice(sumsH.findIndex(v => v > sm) >>> 0, 0, sm); past.add(d.n.join(","));
+      if (performance.now() - t0 > 40) { i++; break; } // 화면이 멈추지 않게 나눠서 계산
     }
-    d.n.forEach(x => { f[x]++; l[x] = d.no; }); // 예측이 끝난 뒤에야 이 회차를 학습
-    if (i) for (const a of D[i - 1].n) { mo[a]++; for (const b of d.n) mt[a][b]++; }
-  });
-  const MU = 0.8, VAR = 0.8 * (39 / 45) * (39 / 44), P3 = [3, 4, 5, 6].reduce((s, k) => s + C(6, k) * C(39, 6 - k), 0) / C(45, 6);
-  $("btTxt").innerHTML = `제${START}회~제${LAST.no}회 ${N - START + 1}회를, 매 회차 <b>그 이전 데이터만</b> 보고 5게임씩 뽑아 실제 결과와 맞춰 봤습니다.
-    무작위 기준: 게임당 평균 0.800개 일치, 3개 이상 ${(P3 * 100).toFixed(2)}%. 전략을 4개 비교하므로 |z| &gt; 2.50이어야 유의합니다.`;
-  $("bt").innerHTML = "<tr><th>전략</th><th>평균 일치</th><th>3개+</th><th>4개+</th><th>z</th><th>판정</th></tr>"
-    + Object.entries(res).map(([k, r]) => { const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n), sig = k !== "무작위" && Math.abs(z) > 2.50;
-      return `<tr><td>${k}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${z >= 0 ? "+" : ""}${z.toFixed(2)}</td>
-        <td>${k === "무작위" ? '<span class="tag">기준</span>' : `<span class="tag ${sig ? "no" : "ok"}">${sig ? "차이 있음" : "무작위와 같음"}</span>`}</td></tr>`; }).join("");
-})();
+    $("btProg").textContent = i < N ? `계산 중… ${Math.round(i / N * 100)}%` : "";
+    if (i < N) setTimeout(step, 0); else done(res);
+  }
+  step();
+}
+// 양측 유의수준 0.05를 비교 전략 수로 나눈 기준 z (본페로니)
+const zCrit = m => { let lo = 1.5, hi = 5; for (let t = 0; t < 40; t++) { const mid = (lo + hi) / 2; (1 - Phi(mid)) * 2 * m > 0.05 ? lo = mid : hi = mid; } return hi; };
+function renderBT() {
+  const MU = 0.8, VAR = 0.8 * (39 / 45) * (39 / 44), P3 = [3, 4, 5, 6].reduce((t, k) => t + C(6, k) * C(39, 6 - k), 0) / C(45, 6);
+  const order = GROUPS.flatMap(g => g[1]).filter(k => k !== "random").concat("random");
+  const rows = order.filter(k => BT[k] || (k === "deep" && dl) || PROFILE.includes(k));
+  const m = rows.filter(k => k !== "random" && (BT[k] || (k === "deep" && dl))).length, zc = zCrit(Math.max(1, m));
+  const tag = (z, k) => k === "random" ? '<span class="tag">기준</span>'
+    : `<span class="tag ${Math.abs(z) > zc ? "no" : "ok"}">${Math.abs(z) > zc ? "차이 있음" : "무작위와 같음"}</span>`;
+  const zs = z => (z >= 0 ? "+" : "") + z.toFixed(2);
+  $("btTxt").innerHTML = `제${BT_START}회~제${LAST.no}회 ${N - BT_START + 1}회를, 매 회차 <b>그 이전 데이터만</b> 보고 각 전략으로 5게임씩 뽑아 실제 결과와 맞춰 봤습니다.
+    추천과 똑같은 전략·제외 규칙을 씁니다. 무작위 기준: 게임당 평균 0.800개 일치, 3개 이상 ${(P3 * 100).toFixed(2)}%.
+    전략을 ${m}개 비교하므로 |z| &gt; ${zc.toFixed(2)}여야 유의합니다.`;
+  $("bt").innerHTML = "<tr><th>전략</th><th>평균 일치</th><th>3개+</th><th>4개+</th><th>z</th><th>판정</th></tr>" + rows.map(k => {
+    const name = STRATS[k][0];
+    if (k === "deep") { const mean = dl.hit / dl.n, z = (mean - MU) / Math.sqrt(VAR / dl.n);
+      return `<tr><td>${name} <small class="note">최근 100회만</small></td><td>${mean.toFixed(3)}</td><td>-</td><td>-</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`; }
+    const r = BT[k];
+    if (!r) return `<tr><td>${name}</td><td colspan="5" class="note" style="text-align:left">${saju ? "계산 중…" : "내 정보 입력 후 계산됩니다"}</td></tr>`;
+    const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n);
+    const who = PROFILE.includes(k) && saju ? ` <small class="note">${saju.name ? esc(saju.name) + " 기준" : "내 사주 기준"}</small>` : "";
+    return `<tr><td>${name}${who}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`;
+  }).join("");
+}
+let btBusy = false, btProfileKey = null;
+function backtestProfile() { // 내 정보가 바뀌면 사주·별자리·점성술형만 다시 계산
+  if (!saju || btBusy || btProfileKey === saju.key) return;
+  const key = saju.key; btBusy = true; PROFILE.forEach(k => delete BT[k]); renderBT();
+  runBacktest(PROFILE, res => { btBusy = false; btProfileKey = key; if (saju && saju.key === key) Object.assign(BT, res); renderBT(); backtestProfile(); });
+}
+const baseKeys = SKEYS.filter(k => !PROFILE.includes(k) && k !== "deep" && (k !== "manse" || window.Solar));
+window.btReady = true;
+renderBT();
+btBusy = true;
+runBacktest(baseKeys, res => { Object.assign(BT, res); btBusy = false; renderBT(); backtestProfile(); });
 </script>
 </body>
 </html>

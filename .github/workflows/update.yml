@@ -30,14 +30,18 @@ jobs:
           python-version: "3.12"
       - name: 동행복권에서 최신 회차 받기
         run: python fetch_lotto.py
+      - name: 딥러닝(LSTM) 학습 (새 회차가 있을 때만)
+        run: |
+          pip install --quiet numpy torch --index-url https://download.pytorch.org/whl/cpu
+          python dl_train.py
       - name: 새 회차가 있으면 저장소에 커밋
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lotto645.csv data.js
+          git add lotto645.csv data.js dl.js
           git diff --cached --quiet || { git commit -m "data: 로또 최신 회차 반영"; git push; }
       - name: 사이트 파일 모으기
-        run: mkdir _site && cp index.html data.js _site/
+        run: mkdir _site && cp index.html data.js dl.js _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

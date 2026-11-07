@@ -159,6 +159,7 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
     <h2>백테스트 — 이 전략들이 실제로 맞췄나</h2>
     <p class="note" id="btTxt"></p>
     <table id="bt"></table>
+    <div id="dlEval"><p class="note" style="margin-top:12px">딥러닝 결과를 준비 중입니다.</p></div>
   </section>
 
   <section class="card">
@@ -170,6 +171,7 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 <div id="tip"></div>
 
 <script src="data.js"></script>
+<script src="dl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js"></script>
 <script>
 "use strict";
@@ -372,6 +374,19 @@ const markovW = Array(46).fill(0); NUMS.forEach(j => markovW[j] = LAST.n.reduce(
 // 양자 확률진폭형 (비유 모델): ψ = √(역대 비율) + √(최근50 비율)·e^{iφ}, φ = π·미출현/7.5 → P ∝ |ψ|² (간섭항 2ab·cosφ)
 const qW = Array(46).fill(0);
 NUMS.forEach(k => { const a = Math.sqrt(freq[k] / (N * 6)), b = Math.sqrt((c50[k] + 0.5) / (300 + 22.5)); qW[k] = a * a + b * b + 2 * a * b * Math.cos(Math.PI * gap(k) / 7.5); });
+// ---------- 딥러닝(LSTM) ----------
+// 학습은 GitHub Actions에서 매주 dl_train.py(PyTorch)로 하고, 페이지는 결과(dl.js)만 읽음
+const dl = window.LOTTO_DL && window.LOTTO_DL.last === N ? window.LOTTO_DL : null;
+function renderDL() {
+  const mean = dl.hit / dl.n, z = (mean - 0.8) / Math.sqrt(0.8 * (39 / 45) * (39 / 44) / dl.n);
+  const top = NUMS.slice().sort((a, b) => dl.p[b - 1] - dl.p[a - 1]).slice(0, 10);
+  $("dlEval").innerHTML = `<h2 style="margin-top:18px;font-size:15px">딥러닝(LSTM) 검증</h2>
+    <p class="note">${dl.model}. 최근 100회를 학습에서 빼고, 그 100회를 한 회씩 예측해 5게임씩 맞춰 봤습니다: 평균 일치 <b>${mean.toFixed(3)}</b>
+      (무작위 0.800), z = ${z >= 0 ? "+" : ""}${z.toFixed(2)} → <span class="tag ${Math.abs(z) > 1.96 ? "no" : "ok"}">${Math.abs(z) > 1.96 ? "차이 있음" : "무작위와 같음"}</span></p>
+    <p class="note">제${LAST.no + 1}회 예측 확률 상위 10개 (무작위면 모두 13.3%):</p>
+    <div class="balls">${top.map(k => `<span class="mini" style="margin:0 6px 0 0">${ball(k)}<span>${(dl.p[k - 1] * 100).toFixed(1)}%</span></span>`).join("")}</div>`;
+}
+
 const cryptoR = () => { const u = new Uint32Array(1); crypto.getRandomValues(u); return u[0] / 4294967296; }; // 운영체제 하드웨어 엔트로피 난수
 
 // ---------- 전략 ----------
@@ -404,6 +419,8 @@ const STRATS = {
   random: ["무작위 혼합형", "완전 무작위 (형태 필터만 적용)", R => pick6(R)],
   markov: ["마르코프 전이형", `직전 회차(${LAST.n.join(", ")}) 번호 다음 회차에 자주 나온 번호에 가중치 (GitHub 예측 프로젝트들의 '이전 회차 → 다음 회차' 방식)`, R => pick6(R, markovW)],
   quantum: ["양자 확률진폭형", "양자역학을 빗댄 모델: 역대 빈도와 최근 빈도를 두 경로의 진폭으로 보고, 미출현 기간을 위상차로 간섭시켜 |ψ|²에 비례해 '측정'. 측정은 운영체제 하드웨어 난수 사용 (실제 양자 난수 아님)", R => pick6(R, qW)],
+  deep: ["딥러닝 LSTM형", "GitHub 인기 예측 프로젝트(LotteryAi 등)와 같은 방식: 직전 10회를 보고 다음 회차를 예측하는 LSTM 신경망을 매주 GitHub 서버에서 학습해 둔 예측 확률로 가중치",
+    R => { const avg = dl.p.reduce((a, b) => a + b, 0) / 45; return pick6(R, [0, ...dl.p.map(v => (v / avg) ** 4)]); }],
   saju: ["사주 오행형", "내 사주의 부족한 오행 + 추첨일 일진 오행 번호에 가중치. 같은 사람·같은 회차·같은 순번이면 항상 같은 번호", R => pick6(R, saju.w)],
   zodiac: ["별자리형", "내 태양 별자리 번호(양자리 1 … 물고기자리 12)와 12씩 더한 수, 같은 원소 별자리 번호, 추첨일 별자리 번호에 가중치", R => pick6(R, saju.west.zw)],
   astro: ["점성술형", "번호를 한 자리로 줄인 수(수비학)가 내 별자리 지배행성·태어난 요일 행성·생명수·추첨일 행성의 수와 같으면 가중치", R => pick6(R, saju.west.aw)],
@@ -435,6 +452,7 @@ function generate() {
   const seed = (Math.random() * 2 ** 31) | 0; current = [];
   choice.forEach((k, i) => {
     const [name, , fn] = STRATS[k];
+    if (k === "deep" && !dl) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 이번 회차 딥러닝 결과가 아직 없습니다. 잠시 후 다시 시도하세요.`; return; }
     const prof = PROFILE.includes(k);
     if (prof && !saju) {
       $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 아래 '내 정보 입력'을 먼저 저장하세요.`; return; }
@@ -478,6 +496,8 @@ try {
     $("sjLeap").checked = p.leap; $("sjY").value = p.y; $("sjM").value = p.m; $("sjD").value = p.d; $("sjH").value = p.h; $("sjMi").value = p.mi;
     applyProfile(p, false); }
 } catch {}
+
+if (dl) renderDL();
 
 // ---------- 백테스트 (각 회차는 직전 회차까지만 사용) ----------
 (function backtest() {

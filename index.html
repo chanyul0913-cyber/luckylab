@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>로또 분석소</title>
+<title>로분소</title>
 <style>
 :root{
   --bg:#f6f5f1;--card:#ffffff;--ink:#1d1d1f;--ink2:#55565c;--muted:#8a8b91;--line:#e4e2dc;
@@ -109,7 +109,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 .phone .chips{justify-content:center;margin:0}
 .phone .chip{position:relative;border:1px solid var(--line);font-size:13px}
 .hl{outline:3px solid #e5322d;outline-offset:2px}
-.no{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;background:#e5322d;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.phone .no{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;background:#e5322d;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .arrow{font-size:20px;color:var(--muted);line-height:1}
 .cap{font-size:16px;line-height:1.6;margin:14px 0 0}
 .picsNav{display:flex;justify-content:space-between;align-items:center;padding:10px 16px 14px;border-top:1px solid var(--line)}
@@ -162,7 +162,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
   <button id="updX" aria-label="닫기">✕</button>
 </div>
 <main>
-  <h1>로또 6/45 분석소</h1>
+  <h1>로분소 <span class="tag">로또 6/45 실제 데이터 분석</span></h1>
   <p class="sub" id="meta">데이터 불러오는 중…</p>
 
   <section class="card quick">
@@ -451,8 +451,6 @@ const pastSet = new Set(D.map(d => d.n.join(",")));
 
 $("meta").textContent = `동행복권 제1회(${fmtDate(D[0].ymd)}) ~ 제${LAST.no}회(${fmtDate(LAST.ymd)}) 실제 당첨번호 ${N}회 분석`;
 $("target").textContent = `제${LAST.no + 1}회 대상`;
-// 처음 방문이면 사용 설명서를 펼쳐 둠
-try { if (!localStorage.getItem("lottoVisited")) { $("guide").open = true; localStorage.setItem("lottoVisited", "1"); } } catch { $("guide").open = true; }
 const drawDateTxt = (() => { const d = new Date(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + 7);
   return `${d.getMonth() + 1}월 ${d.getDate()}일 토요일 20:35`; })();
 $("latest").innerHTML = `<h2>지난 회차 실제 당첨번호 — 제${LAST.no}회 <span class="tag">${fmtDate(LAST.ymd)} 추첨 완료</span></h2>
@@ -494,7 +492,7 @@ const pair = new Map(); D.forEach(d => { for (let i = 0; i < 6; i++) for (let j 
 let pmax = 0, pkey = 0; pair.forEach((v, k) => { if (v > pmax) { pmax = v; pkey = k; } });
 const simMax = []; const R0 = rng(7);
 for (let s = 0; s < 40; s++) { const m = new Int16Array(46 * 46); let mx = 0;
-  for (let i = 0; i < N; i++) { const t = pick6(R0); for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) { const v = ++m[t[a] * 46 + t[b]]; if (v > mx) mx = v; } }
+  for (let i = 0; i < N; i++) { const t = quick6(R0); for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) { const v = ++m[t[a] * 46 + t[b]]; if (v > mx) mx = v; } }
   simMax.push(mx); }
 simMax.sort((a, b) => a - b);
 tests.push([`쌍 동시출현 (최다 ${Math.floor(pkey / 46)}-${pkey % 46})`, `${pmax}회`, `무작위 최다 ${simMax[1]}~${simMax[38]}회`, pmax >= simMax[1] && pmax <= simMax[38]]);
@@ -673,6 +671,8 @@ function pick6(R, w) { // 가중치 w로 비복원 6개 (w 없으면 균등)
     out.push(pool.splice(i, 1)[0]); ws.splice(i, 1); }
   return out.sort((a, b) => a - b);
 }
+// 균등 6개 빠른 뽑기 (부분 Fisher-예이츠): 무작위 시뮬 등 가중치 없는 대량 추출용
+function quick6(R) { const a = NUMS.slice(); for (let i = 0; i < 6; i++) { const j = i + Math.floor(R() * (45 - i)); const t = a[i]; a[i] = a[j]; a[j] = t; } return [a[0], a[1], a[2], a[3], a[4], a[5]].sort((x, y) => x - y); }
 // 피셔-예이츠 섞기 (sort에 무작위 비교함수를 쓰면 브라우저 상태에 따라 결과가 달라질 수 있음)
 const shuffle = (a, R) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 // 사람들이 몰리는 조합 회피 + 역대 형태 범위
@@ -1016,9 +1016,13 @@ function runBacktest(keys, done) {
           get zw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).zw; },
           get aw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).aw; } };
         const win = new Set(d.n);
+        // 비싼 가중치(markovW·qW·manseW·sajuW·zw·aw)는 회차당 한 번만 계산해 모든 전략이 공유
+        for (const key of ["markovW", "qW", "manseW", "sajuW", "zw", "aw"]) {
+          const raw = Object.getOwnPropertyDescriptor(ctx, key).get; let v;
+          Object.defineProperty(ctx, key, { get: () => v ??= raw.call(ctx) });
+        }
         for (const k of keys) {
           const fn = STRATS[k][2], R = rng(no * 7919 + hashStr(k)), cx = Object.create(ctx);
-          for (const key of ["markovW", "qW", "manseW", "sajuW", "zw", "aw"]) { let v; Object.defineProperty(cx, key, { get: () => v ??= ctx[key] }); } // 회차당 한 번만 계산
           for (let g = 0; g < 5; g++) {
             let s, tries = 0;
             do s = fn(R, cx); while (++tries < 500 && !okShape(s, cx));

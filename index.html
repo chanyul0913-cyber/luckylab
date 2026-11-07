@@ -200,7 +200,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     <ul>
       <li><b>통계형</b> — 역대·최근 출현 빈도, 오래 안 나온 번호, 번호 구간을 고르게.</li>
       <li><b>AI·모델형</b> — 딥러닝(LSTM), 마르코프 전이, 양자 확률진폭(비유 모델).</li>
-      <li><b>동양 역학형</b> — 만세력형(이번 추첨 시각의 사주, 입력 필요 없음), 사주 오행형(내 사주, <b>사주 입력 필수</b>).</li>
+      <li><b>동양 역학형</b> — 만세력형(이번 추첨 시각의 사주, 입력 필요 없음), 사주 오행형(내 사주, <b>사주 입력 필수</b>), 유명인사주형(유명인·세계 부자 사주를 추첨일 토요일 운세 점수로 채점해 상위 3명을 섞음, 입력 필요 없음).</li>
       <li><b>서양 점성형</b> — 별자리형, 점성술형 (둘 다 <b>사주 입력 필수</b>).</li>
       <li><b>무작위</b> — 완전 무작위.</li>
     </ul>
@@ -242,7 +242,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     <h3>자주 묻는 질문</h3>
     <dl>
       <dt>같은 전략인데 번호가 매번 똑같이 나와요.</dt>
-      <dd>만세력형·사주 오행형·별자리형·점성술형은 '정해진 기운'으로 고르기 때문에 같은 사람·같은 회차면 항상 같은 번호가 나옵니다. 다음 회차가 되면 바뀝니다. 나머지 전략은 누를 때마다 바뀝니다.</dd>
+      <dd>만세력형·사주 오행형·별자리형·점성술형·유명인사주형은 '정해진 기운'으로 고르기 때문에 같은 사람·같은 회차면 항상 같은 번호가 나옵니다. 다음 회차가 되면 바뀝니다. 나머지 전략은 누를 때마다 바뀝니다.</dd>
       <dt>화면 위에 '🔄 새 버전이 나왔어요' 띠가 떠요.</dt>
       <dd>사이트가 고쳐졌거나 새 당첨번호가 들어왔다는 뜻입니다. 띠의 <b>[새로고침]</b>을 누르면 최신 화면으로 바뀝니다. 입력해 둔 사주와 내 목록은 그대로 남습니다. 지금 보던 번호를 먼저 복사하고 싶으면 ✕로 닫았다가 나중에 눌러도 됩니다.</dd>
       <dt>새 회차는 언제 반영되나요?</dt>
@@ -549,14 +549,78 @@ function calcSaju(p) {
   return { name: p.name, pillars, cnt, draw, ohW, w, key, known, solar: solar.toYmd(), cal: p.cal };
 }
 // 내 사주 오행 개수 + 그 추첨일의 일진 → 번호 가중치 (백테스트에서도 과거 추첨일마다 사용)
-function sajuWeightsAt(cnt, date) {
-  const dz = Solar.fromDate(date).getLunar().getDayInGanZhi();
-  const draw = { gan: GAN.indexOf(dz[0]), ji: JI.indexOf(dz[1]), hanja: dz };
+const dayGZ = date => { const dz = Solar.fromDate(date).getLunar().getDayInGanZhi(); return { gan: GAN.indexOf(dz[0]), ji: JI.indexOf(dz[1]), hanja: dz }; };
+function ohWeights(cnt, draw) {
   const mx = Math.max(...Object.values(cnt));
   const ohW = Object.fromEntries(OHS.map(o => [o, (mx - cnt[o]) + 1 + (o === GAN_OH[draw.gan] ? 2 : 0) + (o === JI_OH[draw.ji] ? 1 : 0)]));
   const w = Array(46).fill(0); NUMS.forEach(n => w[n] = ohW[numOh(n)]);
-  return { draw, ohW, w };
+  return { ohW, w };
 }
+function sajuWeightsAt(cnt, date) { const draw = dayGZ(date); return { draw, ...ohWeights(cnt, draw) }; }
+
+// ---------- 유명인사주형: SAJOO(holoolook/sajoo) 오늘의 운세 점수 방식 이식 ----------
+// 점수 = 일간 기준 오늘 일진의 십신 점수(천간+지지) + 지지 관계(육합2·삼합2·충-2·형·해·원진-1·파-1)
+//   + 오행 생극(±1) + 용신운(+1)/기신운(-1) + 천간합(+1). 재물운은 십신이 재성(편재·정재)일 때의 점수 + 합 + 용신운.
+// 용신은 '사주에서 가장 부족한 오행'으로 근사했다 (원 사이트의 상세 알고리즘은 공개되지 않음)
+const TEN_SCORE = { 정관: 2, 정재: 2, 정인: 2, 식신: 2, 편재: 1, 편인: 1, 비견: 0, 겁재: -1, 상관: -1, 편관: -1 };
+const REL_SCORE = { 육합: 2, 삼합: 2, 충: -2, 형: -1, 해: -1, 원진: -1, 파: -1 };
+const REL_TABLE = [
+  ["육합", [["자", "축"], ["인", "해"], ["묘", "술"], ["진", "유"], ["사", "신"], ["오", "미"]]],
+  ["삼합", [["신", "자"], ["자", "진"], ["신", "진"], ["인", "오"], ["오", "술"], ["인", "술"], ["사", "유"], ["유", "축"], ["사", "축"], ["해", "묘"], ["묘", "미"], ["해", "미"]]],
+  ["충", [["자", "오"], ["축", "미"], ["인", "신"], ["묘", "유"], ["진", "술"], ["사", "해"]]],
+  ["형", [["인", "사"], ["사", "신"], ["인", "신"], ["축", "술"], ["술", "미"], ["축", "미"], ["자", "묘"], ["진", "진"], ["오", "오"], ["유", "유"], ["해", "해"]]],
+  ["해", [["자", "미"], ["축", "오"], ["인", "사"], ["묘", "진"], ["신", "해"], ["유", "술"]]],
+  ["원진", [["자", "술"], ["축", "유"], ["인", "신"], ["묘", "미"], ["진", "오"], ["사", "해"]]],
+  ["파", [["자", "유"], ["오", "묘"], ["진", "축"], ["술", "미"], ["인", "해"], ["신", "사"]]]];
+const OH_GEN = { 목: "화", 화: "토", 토: "금", 금: "수", 수: "목" }, OH_KEUK = { 목: "토", 토: "수", 수: "화", 화: "금", 금: "목" };
+const CELEB_HAP = [[0, 5], [1, 6], [2, 7], [3, 8], [4, 9]]; // 갑기·을경·병신·정임·무계합 (GAN 인덱스)
+const zaRel = (a, b) => { for (const [k, ps] of REL_TABLE) if (ps.some(([x, y]) => x === a && y === b || x === b && y === a)) return k; return null; };
+function shiShen(dOh, dYang, xOh, xYang) { // 일간 기준 십신 (오행 관계 + 음양)
+  if (xOh === dOh) return dYang === xYang ? "비견" : "겁재";
+  if (OH_GEN[dOh] === xOh) return dYang === xYang ? "식신" : "상관";
+  if (OH_KEUK[dOh] === xOh) return dYang === xYang ? "편재" : "정재";
+  if (OH_KEUK[xOh] === dOh) return dYang === xYang ? "편관" : "정관";
+  return dYang === xYang ? "편인" : "정인";
+}
+function celebScore(c, draw) { // c: {cnt, dmGan, dmJi}, draw: dayGZ 결과 → SAJOO식 그 날짜 운세 점수
+  const dmOh = GAN_OH[c.dmGan], dmYang = c.dmGan % 2 === 0, stOh = GAN_OH[draw.gan], stYang = draw.gan % 2 === 0,
+    brOh = JI_OH[draw.ji], brYang = draw.ji % 2 === 0;
+  const sg = shiShen(dmOh, dmYang, stOh, stYang), bg = shiShen(dmOh, dmYang, brOh, brYang), rel = zaRel(JI_K[c.dmJi], JI_K[draw.ji]);
+  const d = OH_GEN[stOh] === dmOh || OH_GEN[dmOh] === stOh || OH_KEUK[dmOh] === stOh ? 1 : OH_KEUK[stOh] === dmOh ? -1 : 0;
+  const yong = OHS.slice().sort((a, b) => c.cnt[a] - c.cnt[b] || OHS.indexOf(a) - OHS.indexOf(b))[0];
+  const gisin = OHS.find(o => OH_KEUK[o] === dmOh);
+  const yU = brOh === yong ? 1 : brOh === gisin ? -1 : 0;
+  const hap = CELEB_HAP.some(([a, b]) => a === draw.gan && b === c.dmGan || a === c.dmGan && b === draw.gan);
+  const g = TEN_SCORE[sg] + TEN_SCORE[bg] + (rel ? REL_SCORE[rel] : 0) + d + yU + (hap ? 1 : 0);
+  const wealth = (sg === "편재" || sg === "정재" ? TEN_SCORE[sg] : 0) + (bg === "편재" || bg === "정재" ? TEN_SCORE[bg] : 0)
+    + (rel === "육합" || rel === "삼합" ? REL_SCORE[rel] : 0) + Math.max(0, yU);
+  return { g, wealth, grade: g >= 4 ? "대길" : g >= 2 ? "길" : g >= -1 ? "평" : g >= -3 ? "흉" : "대흉", sg, bg, rel };
+}
+let celebData;
+function celebList() { // CELEBS(유명인·세계 부자 TOP10) 사주의 일간·일지·오행 개수를 한 번만 계산해 캐시
+  if (celebData !== undefined) return celebData;
+  celebData = [];
+  if (window.Solar && window.Lunar) celebData = CELEBS.map(c => { try {
+    const s = calcSaju(toP(c));
+    return { name: c[1], cnt: s.cnt, dmGan: s.pillars[2].gan, dmJi: s.pillars[2].ji };
+  } catch { return null; } }).filter(Boolean);
+  return celebData;
+}
+function celebBlendAt(date) { // 유명인 전원을 그 날짜 운세 점수로 채점 → 상위 3명 사주 가중치를 3:2:1로 합성
+  const list = celebList();
+  if (!list.length) return null;
+  const draw = dayGZ(date);
+  const scored = list.map(c => ({ name: c.name, c, r: celebScore(c, draw) }))
+    .sort((a, b) => (b.r.g + b.r.wealth) - (a.r.g + a.r.wealth) || b.r.g - a.r.g || (a.name < b.name ? -1 : 1));
+  const w = Array(46).fill(0), top = scored.slice(0, 3);
+  top.forEach((t, i) => { const ww = ohWeights(t.c.cnt, draw).w, k = 3 - i; for (let n = 1; n <= 45; n++) w[n] += k * ww[n]; });
+  return { w, top };
+}
+function celebPlan() { // 이번 추첨일(토요일) 기준 — 같은 주면 항상 같은 결과
+  if (celebCache !== undefined) return celebCache;
+  return celebCache = window.Solar ? celebBlendAt(drawDate) : null;
+}
+let celebCache;
 const gzK = x => GAN_K[x.gan] + JI_K[x.ji];
 function renderSaju() {
   if (!saju) { $("sajuOut").innerHTML = ""; return; }
@@ -747,15 +811,19 @@ function manseAt(date) {
 }
 STRATS.manse = ["만세력형", "내 정보 없이, 이번 추첨 시각(토 20:35)의 년·월·일·시 4기둥을 만세력으로 뽑아, 그 시각에 강한 오행의 번호(끝자리 하도 수리)와 각 기둥의 60갑자 순번 번호에 가중치. 그 주에는 누구에게나 같은 번호",
   (R, c = LIVE) => pick6(R, c.manseW)];
+// 유명인사주형: 유명인 전원을 추첨일(토요일) 기준 SAJOO식 운세 점수로 채점, 재물운까지 합산해 상위 3명 가중치를 3:2:1로 합성
+STRATS.celeb = ["유명인사주형", "아래 유명인·세계 부자 TOP10 사주를 추첨일 토요일 기준 오늘의 운세 점수로 채점합니다 (SAJOO 방식: 일간 기준 일진 십신 + 지지 육합·삼합·충 + 오행 생극 + 용신운 + 천간합). 총점+재물운이 높은 순서대로 상위 3명의 사주 오행 가중치를 3:2:1로 섞어 뽑습니다. 같은 주에는 같은 결과. 운세 점수는 1등 확률과 무관",
+  (R, c = LIVE) => pick6(R, c.celebW)];
 // 실시간 추천에 쓰는 기준값 (백테스트는 회차마다 그 시점까지의 값으로 같은 함수를 부름)
 const LIVE = { qlo: q(0.1), qhi: q(0.9), prev: LAST.n, pastSet, freq, c50, overdue, markovW, qW,
-  get sajuW() { return saju.w; }, get zw() { return saju.west.zw; }, get aw() { return saju.west.aw; }, get manseW() { return manse().w; } };
+  get sajuW() { return saju.w; }, get zw() { return saju.west.zw; }, get aw() { return saju.west.aw; }, get manseW() { return manse().w; },
+  get celebW() { return celebPlan().w; } };
 STRATS.btop = ["백테스트형", "아래 백테스트 표에서 3개 이상 맞힌 비율(3+)이 높은 전략 1~5위를 순서대로 게임에 배정 (6게임 이상이면 1위부터 반복, 동률이면 평균 일치가 높은 쪽). 딥러닝은 3+ 기록이 있을 때 최근 100회 기준으로 함께 비교. 순위 차이는 우연 범위이며, 이 방식 자체의 성적도 백테스트 표에 나옵니다", null];
 const PROFILE = ["saju", "zodiac", "astro"]; // 내 정보가 필요한 전략
-const FIXED = [...PROFILE, "manse"];        // 같은 조건이면 항상 같은 번호가 나오는 전략
+const FIXED = [...PROFILE, "manse", "celeb"]; // 같은 조건이면 항상 같은 번호가 나오는 전략
 const SKEYS = Object.keys(STRATS);
 const GROUPS = [["통계형", ["balance", "recent", "overdue", "spread"]], ["AI·모델형", ["deep", "markov", "quantum"]], ["백테스트형", ["btop"]],
-  ["동양 역학형", ["manse", "saju"]], ["서양 점성형", ["zodiac", "astro"]], ["무작위", ["random"]]];
+  ["동양 역학형", ["manse", "saju", "celeb"]], ["서양 점성형", ["zodiac", "astro"]], ["무작위", ["random"]]];
 const optLabel = k => STRATS[k][0] + (PROFILE.includes(k) ? " (내 정보 필요)" : "");
 console.assert(GROUPS.flatMap(g => g[1]).sort().join() === SKEYS.slice().sort().join(), "전략 묶음 누락");
 const optHtml = sel => GROUPS.map(([g, ks]) => `<optgroup label="${g}">`
@@ -841,8 +909,9 @@ function generate() {
       $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 아래 '내 정보 입력'을 먼저 저장하세요.`; return; }
     // 사주·별자리·점성술형은 사람·회차·전략·순번으로 시드를 고정하고 겹침 검사도 하지 않음 (항상 같은 결과)
     if (k === "manse" && !manse()) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 만세력 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.`; return; }
+    if (k === "celeb" && !celebPlan()) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 유명인 사주를 계산하지 못했습니다. 인터넷 연결을 확인하세요.`; return; }
     const fixed = FIXED.includes(k);
-    const R = prof ? rng(hashStr(saju.key + (k === "saju" ? "" : k) + i)) : k === "manse" ? rng(hashStr(manse().key + i)) : k === "quantum" ? cryptoR : rng(seed + i * 7919);
+    const R = prof ? rng(hashStr(saju.key + (k === "saju" ? "" : k) + i)) : k === "manse" ? rng(hashStr(manse().key + i)) : k === "celeb" ? rng(hashStr("celeb:" + drawDate.toDateString() + ":" + i)) : k === "quantum" ? cryptoR : rng(seed + i * 7919);
     let s, tries = 0;
     do s = fn(R); while (++tries < 5000 && (!okShape(s) || (!fixed && current.some(c => c.s.filter(x => s.includes(x)).length > 2))));
     current.push({ name, s });
@@ -852,7 +921,8 @@ function generate() {
       + (k === "saju" ? ` · 오행 ${s.map(numOh).join("")}` : "")
       + (k === "astro" ? ` · 수비 ${s.map(dr).join("")}` : "")
       + (k === "zodiac" ? ` · 별자리 ${s.map(x => SIGNS[(x - 1) % 12][1]).join("")}` : "")
-      + (k === "manse" ? ` · 추첨 시각 ${manse().pil.map(x => gzK(x) + x.name).join(" ")}` : "");
+      + (k === "manse" ? ` · 추첨 시각 ${manse().pil.map(x => gzK(x) + x.name).join(" ")}` : "")
+      + (k === "celeb" ? ` · ${drawDate.getMonth() + 1}/${drawDate.getDate()} 토요일 운세 ` + celebPlan().top.map((t, j) => `${j + 1}위 ${t.name}(${t.r.grade}, 재물+${t.r.wealth})`).join(", ") : "");
   });
   $("copy").disabled = !current.length;
   if (choice.some(k => PROFILE.includes(k)) && !saju) $("sjY").focus();
@@ -1014,10 +1084,11 @@ function runBacktest(keys, done) {
           get manseW() { return manseAt(drawDay(d)).w; },
           get sajuW() { return sajuWeightsAt(saju.cnt, drawDay(d)).w; },
           get zw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).zw; },
-          get aw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).aw; } };
+          get aw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).aw; },
+          get celebW() { return celebBlendAt(drawDay(d)).w; } };
         const win = new Set(d.n);
         // 비싼 가중치(markovW·qW·manseW·sajuW·zw·aw)는 회차당 한 번만 계산해 모든 전략이 공유
-        for (const key of ["markovW", "qW", "manseW", "sajuW", "zw", "aw"]) {
+        for (const key of ["markovW", "qW", "manseW", "sajuW", "zw", "aw", "celebW"]) {
           const raw = Object.getOwnPropertyDescriptor(ctx, key).get; let v;
           Object.defineProperty(ctx, key, { get: () => v ??= raw.call(ctx) });
         }
@@ -1097,7 +1168,7 @@ function backtestProfile() { // 내 정보가 바뀌면 사주·별자리·점�
   const key = saju.key; btBusy = true; PROFILE.forEach(k => delete BT[k]); renderBT();
   runBacktest(PROFILE, res => { btBusy = false; btProfileKey = key; if (saju && saju.key === key) Object.assign(BT, res); computeMeta(); renderBT(); backtestProfile(); });
 }
-const baseKeys = SKEYS.filter(k => !PROFILE.includes(k) && k !== "deep" && k !== "btop" && (k !== "manse" || window.Solar));
+const baseKeys = SKEYS.filter(k => !PROFILE.includes(k) && k !== "deep" && k !== "btop" && ((k !== "manse" && k !== "celeb") || window.Solar));
 window.btReady = true;
 renderBT();
 btBusy = true;

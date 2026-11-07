@@ -195,6 +195,9 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
       <li><b>공 색상</b> 5가지(노랑·파랑·빨강·회색·초록)가 모두 들어간 조합</li>
       <li><b>소수</b>(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43)가 0개이거나 5개 이상</li>
       <li>로또 용지 <b>가로줄</b>(1~7, 8~14, 15~21 …) 한 줄에 4개 이상, 또는 6개가 모두 서로 다른 줄</li>
+      <li>로또 용지 <b>세로줄</b>(1·8·15·22·29·36·43 …) 한 줄에 4개 이상</li>
+      <li><b>3의 배수</b>가 5개 이상, 또는 <b>5의 배수</b>가 4개 이상</li>
+      <li>지난 회차 당첨번호와 3개 이상 겹치는 조합 (<b>이월수</b> 3개 이상)</li>
     </ul>
 
     <h3>🔮 내 사주 맞춤 배분</h3>
@@ -636,6 +639,11 @@ function okShape(s) {
   const row = {}; s.forEach(x => row[(x - 1) / 7 | 0] = (row[(x - 1) / 7 | 0] || 0) + 1);
   const rmax = Math.max(...Object.values(row));
   if (rmax === 1 || rmax >= 4) return false;                            // 용지 가로줄(7칸) 최대 개수 1개 또는 4개 이상
+  const colc = {}; s.forEach(x => colc[(x - 1) % 7] = (colc[(x - 1) % 7] || 0) + 1);
+  if (Math.max(...Object.values(colc)) >= 4) return false;              // 용지 세로줄 최대 개수 4개 이상
+  if (s.filter(x => x % 3 === 0).length >= 5) return false;             // 3의 배수 5개 이상
+  if (s.filter(x => x % 5 === 0).length >= 4) return false;             // 5의 배수 4개 이상
+  if (s.filter(x => LAST.n.includes(x)).length >= 3) return false;      // 이월수(직전 회차 번호) 3개 이상
   return !pastSet.has(s.join(","));                                    // 역대 1등 조합 그대로 회피
 }
 const PRIMES = new Set([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43]);
@@ -693,7 +701,7 @@ console.assert(GROUPS.flatMap(g => g[1]).sort().join() === SKEYS.slice().sort().
 const optHtml = sel => GROUPS.map(([g, ks]) => `<optgroup label="${g}">`
   + ks.map(k => `<option value="${k}"${k === sel ? " selected" : ""}>${optLabel(k)}</option>`).join("") + "</optgroup>").join("");
 $("stratHelp").innerHTML = GROUPS.map(([g, ks]) => `<b style="color:var(--accent)">${g}</b><br>` + ks.map(k => `<b>${optLabel(k)}</b> — ${STRATS[k][1]}`).join("<br>")).join("<br><br>") + "<br>"
-  + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.<br><b>추가 제외 규칙</b> — 합성수 5개 이상 · 공 색상 5가지가 모두 들어간 조합 · 소수 0개 또는 5개 이상 · 용지 가로줄(1~7, 8~14 …) 한 줄에 4개 이상이거나 6개가 모두 다른 줄인 조합. 이 규칙들은 취향에 따른 필터이며 1등 확률을 바꾸지 않습니다.";
+  + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.<br><b>추가 제외 규칙</b> — 합성수 5개 이상 · 공 색상 5가지가 모두 들어간 조합 · 소수 0개 또는 5개 이상 · 용지 가로줄(1~7, 8~14 …) 한 줄에 4개 이상이거나 6개가 모두 다른 줄인 조합 · 용지 세로줄(1·8·15 …) 한 줄에 4개 이상 · 3의 배수 5개 이상 · 5의 배수 4개 이상 · 직전 회차 번호(이월수) 3개 이상. 이 규칙들은 취향에 따른 필터이며 1등 확률을 바꾸지 않습니다.";
 $("gameCount").innerHTML = Array.from({ length: 10 }, (_, i) => `<option${i === 4 ? " selected" : ""}>${i + 1}</option>`).join("");
 $("allStrat").innerHTML = `<option value="">게임별로 고르기</option><option value="__saju">🔮 내 사주 맞춤 배분</option>` + optHtml("");
 

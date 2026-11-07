@@ -122,6 +122,11 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 .fold .more{display:inline-block;margin-top:6px;font-size:13px;color:var(--accent);font-weight:700}
 .fold[open] .more{display:none}
 .fold .sub{border-top:1px solid var(--line);margin-top:16px;padding-top:16px}
+.updBar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;
+  padding:10px 16px;background:#2f6fb0;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.updBar[hidden]{display:none}
+.updBar button{padding:7px 14px}
+.updBar #updX{background:none;border:0;color:#fff;font-size:16px;padding:4px 8px}
 .hitball{outline:3px solid #e5322d;outline-offset:2px}
 .warn{margin:8px 0 0;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--warn);border:1px solid var(--warn)}
 .sajuGrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px}
@@ -151,6 +156,11 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 </style>
 </head>
 <body>
+<div id="updBar" class="updBar" role="status" hidden>
+  <span>🔄 새 버전이 나왔어요</span>
+  <button id="updGo" class="primary">새로고침</button>
+  <button id="updX" aria-label="닫기">✕</button>
+</div>
 <main>
   <h1>로또 6/45 분석소</h1>
   <p class="sub" id="meta">데이터 불러오는 중…</p>
@@ -233,6 +243,8 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     <dl>
       <dt>같은 전략인데 번호가 매번 똑같이 나와요.</dt>
       <dd>만세력형·사주 오행형·별자리형·점성술형은 '정해진 기운'으로 고르기 때문에 같은 사람·같은 회차면 항상 같은 번호가 나옵니다. 다음 회차가 되면 바뀝니다. 나머지 전략은 누를 때마다 바뀝니다.</dd>
+      <dt>화면 위에 '🔄 새 버전이 나왔어요' 띠가 떠요.</dt>
+      <dd>사이트가 고쳐졌거나 새 당첨번호가 들어왔다는 뜻입니다. 띠의 <b>[새로고침]</b>을 누르면 최신 화면으로 바뀝니다. 입력해 둔 사주와 내 목록은 그대로 남습니다. 지금 보던 번호를 먼저 복사하고 싶으면 ✕로 닫았다가 나중에 눌러도 됩니다.</dd>
       <dt>새 회차는 언제 반영되나요?</dt>
       <dd>토요일 추첨(20:35) 뒤 밤 사이에 자동으로 반영됩니다. 늦어도 일요일 오전에는 반영됩니다.</dd>
       <dt>'📊 검정 · 백테스트'는 뭔가요?</dt>
@@ -1086,6 +1098,26 @@ window.btReady = true;
 renderBT();
 btBusy = true;
 runBacktest(baseKeys, res => { Object.assign(BT, res); btBusy = false; computeMeta(); renderBT(); backtestProfile(); });
+
+// ---------- 새 버전 확인 ----------
+// 배포할 때 GitHub Actions가 APP_VER와 version.json에 같은 번호를 넣음. 열어 둔 화면이 예전 버전이면 띠를 띄움
+const APP_VER = "__APP_VER__";
+let updDismissed = null;
+async function checkVersion() {
+  if (APP_VER.startsWith("__")) return; // 내 PC에서 직접 열 때는 확인 안 함
+  try {
+    const r = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" }); // 캐시를 거치지 않고 서버에 직접 물어봄
+    if (!r.ok) return;
+    const { v } = await r.json();
+    if (v && v !== APP_VER && v !== updDismissed) { $("updBar").hidden = false; $("updBar").dataset.v = v; }
+  } catch {} // 인터넷이 끊겼으면 다음에 다시
+}
+// 주소 뒤에 새 버전 번호를 붙여 열면 브라우저가 저장해 둔 예전 페이지 대신 새 페이지를 받음
+$("updGo").onclick = () => location.replace(location.pathname + "?v=" + $("updBar").dataset.v + location.hash);
+$("updX").onclick = () => { updDismissed = $("updBar").dataset.v; $("updBar").hidden = true; };
+setTimeout(checkVersion, 1500);                                         // 열자마자
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); }); // 다른 앱 보다가 돌아올 때
+setInterval(checkVersion, 5 * 60 * 1000);                              // 열어 둔 동안 5분마다
 </script>
 </body>
 </html>

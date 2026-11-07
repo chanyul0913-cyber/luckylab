@@ -419,7 +419,7 @@ const $ = id => document.getElementById(id);
 if (!window.LOTTO) { $("meta").textContent = "data.js가 없습니다. fetch_lotto.py를 먼저 실행하세요."; throw new Error("no data"); }
 
 // ---------- 데이터 ----------
-const D = LOTTO.map(r => ({ no: r[0], ymd: r[1], n: r.slice(2, 8), b: r[8], w1: r[9], a1: r[10] }));
+const D = LOTTO.map(r => ({ no: r[0], ymd: r[1], n: r.slice(2, 8), b: r[8], w1: r[9], a1: r[10], sales: r[11] }));
 const N = D.length, LAST = D[N - 1];
 const NUMS = Array.from({ length: 45 }, (_, i) => i + 1);
 const C = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = r * (n - k + i) / i; return r; };
@@ -458,7 +458,7 @@ const drawDateTxt = (() => { const d = new Date(+LAST.ymd.slice(0, 4), +LAST.ymd
 $("latest").innerHTML = `<h2>지난 회차 실제 당첨번호 — 제${LAST.no}회 <span class="tag">${fmtDate(LAST.ymd)} 추첨 완료</span></h2>
   <p class="warn">⚠️ 이미 끝난 추첨의 결과입니다. <b>추천 번호가 아닙니다.</b> 추천 번호는 아래 '번호 뽑기'에서 버튼을 눌러야 나옵니다.</p>
   <div class="balls" style="margin:10px 0">${LAST.n.map(ball).join("")}<span class="plus">+</span>${ball(LAST.b)}</div>
-  <p class="note">1등 ${LAST.w1}명 · 1인당 ${won(LAST.a1)} · 다음 추첨은 제${LAST.no + 1}회 (${drawDateTxt})</p>`;
+  <p class="note">${!LAST.sales && !LAST.w1 ? "1등 당첨금 집계 중 (발표되면 자동 반영)" : LAST.w1 ? `1등 ${LAST.w1}명 · 1인당 ${won(LAST.a1)}` : "1등 당첨자 없음"} · 다음 추첨은 제${LAST.no + 1}회 (${drawDateTxt})</p>`;
 
 // ---------- 빈도 차트 ----------
 const tip = $("tip");

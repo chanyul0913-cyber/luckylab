@@ -39,6 +39,14 @@ while True:
     epsd = max(rows) + 1
     time.sleep(0.5)  # 서버 부담 줄이기
 
+# 추첨 직후에 받으면 당첨금 발표 전이라 판매액·당첨자 수가 0으로 옴 → 그런 회차는 다시 받아 채움
+for k in [k for k in sorted(rows) if int(rows[k][20]) == 0]:
+    for d in fetch(k):
+        if int(d["ltEpsd"]) == k and int(d["rlvtEpsdSumNtslAmt"]) > 0:
+            rows[k] = [d[c] for c in COLS]
+            print(f"{k}회 당첨금 정보 채움")
+    time.sleep(0.5)
+
 with open(OUT, "w", newline="", encoding="utf-8-sig") as f:
     w = csv.writer(f)
     w.writerow(HDR)
@@ -56,8 +64,8 @@ for k in ks:
 print(f"완료: 1~{ks[-1]}회, {len(ks)}건 -> {OUT}")
 
 # 웹 분석소(index.html)용: file://로 열어도 되도록 JSON이 아닌 JS로 저장
-# [회차, 추첨일, 번호1~6, 보너스, 1등 당첨자수, 1등 당첨금]
-data = [[int(rows[k][0]), str(rows[k][1])] + [int(x) for x in rows[k][2:11]] for k in ks]
+# [회차, 추첨일, 번호1~6, 보너스, 1등 당첨자수, 1등 당첨금, 총판매액(0이면 당첨금 집계 전)]
+data = [[int(rows[k][0]), str(rows[k][1])] + [int(x) for x in rows[k][2:11]] + [int(rows[k][20])] for k in ks]
 with open(os.path.join(os.path.dirname(OUT), "data.js"), "w", encoding="utf-8") as f:
     f.write("window.LOTTO=" + json.dumps(data, separators=(",", ":")) + ";\n")
 print("data.js 갱신")

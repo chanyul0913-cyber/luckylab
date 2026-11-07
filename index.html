@@ -637,6 +637,8 @@ function pick6(R, w) { // 가중치 w로 비복원 6개 (w 없으면 균등)
     out.push(pool.splice(i, 1)[0]); ws.splice(i, 1); }
   return out.sort((a, b) => a - b);
 }
+// 피셔-예이츠 섞기 (sort에 무작위 비교함수를 쓰면 브라우저 상태에 따라 결과가 달라질 수 있음)
+const shuffle = (a, R) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 // 사람들이 몰리는 조합 회피 + 역대 형태 범위
 function okShape(s, c = LIVE) {
   if (s.length !== 6 || new Set(s).size !== 6) return false;           // 안전장치: 서로 다른 6개
@@ -667,12 +669,12 @@ const STRATS = {
   balance: ["전체 통계 균형형", "역대 출현 빈도를 가중치로 사용", (R, c = LIVE) => pick6(R, c.freq)],
   recent: ["최근 50회 참고형", "최근 50회 출현 횟수 + 1을 가중치로 사용", (R, c = LIVE) => pick6(R, c.c50.map(v => v + 1))],
   overdue: ["미출현 포함형", `장기 미출현 상위 5개(${overdue.join(", ")}) 중 2개 + 나머지 무작위`, (R, c = LIVE) => {
-    const o = c.overdue.slice().sort(() => R() - .5).slice(0, 2);
+    const o = shuffle(c.overdue, R).slice(0, 2);
     const pool = NUMS.filter(x => !c.overdue.includes(x)), a = []; // 나머지 4개는 미출현 상위 5개를 뺀 40개에서
     while (a.length < 4) a.push(pool.splice(Math.floor(R() * pool.length), 1)[0]);
     return [...o, ...a].sort((x, y) => x - y); }],
   spread: ["구간 분산형", "1-10·11-20·21-30·31-40·41-45 다섯 구간 중 4곳을 골라 하나씩 + 같은 4구간에서 2개 더 (공 색상 4가지)", R => {
-    const zones = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 45]].sort(() => R() - .5).slice(0, 4);
+    const zones = shuffle([[1, 10], [11, 20], [21, 30], [31, 40], [41, 45]], R).slice(0, 4);
     const s = zones.map(([a, b]) => a + Math.floor(R() * (b - a + 1)));
     const pool = zones.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i)).filter(x => !s.includes(x));
     while (s.length < 6) s.push(pool.splice(Math.floor(R() * pool.length), 1)[0]);
@@ -712,10 +714,11 @@ STRATS.manse = ["만세력형", "내 정보 없이, 이번 추첨 시각(토 20:
 // 실시간 추천에 쓰는 기준값 (백테스트는 회차마다 그 시점까지의 값으로 같은 함수를 부름)
 const LIVE = { qlo: q(0.1), qhi: q(0.9), prev: LAST.n, pastSet, freq, c50, overdue, markovW, qW,
   get sajuW() { return saju.w; }, get zw() { return saju.west.zw; }, get aw() { return saju.west.aw; }, get manseW() { return manse().w; } };
+STRATS.btop = ["백테스트형", "아래 백테스트 표에서 3개 이상 맞힌 비율(3+)이 높은 전략 1~5위를 순서대로 게임에 배정 (6게임 이상이면 1위부터 반복, 동률이면 평균 일치가 높은 쪽). 딥러닝은 3+ 기록이 있을 때 최근 100회 기준으로 함께 비교. 순위 차이는 우연 범위이며, 이 방식 자체의 성적도 백테스트 표에 나옵니다", null];
 const PROFILE = ["saju", "zodiac", "astro"]; // 내 정보가 필요한 전략
 const FIXED = [...PROFILE, "manse"];        // 같은 조건이면 항상 같은 번호가 나오는 전략
 const SKEYS = Object.keys(STRATS);
-const GROUPS = [["통계형", ["balance", "recent", "overdue", "spread"]], ["AI·모델형", ["deep", "markov", "quantum"]],
+const GROUPS = [["통계형", ["balance", "recent", "overdue", "spread"]], ["AI·모델형", ["deep", "markov", "quantum"]], ["백테스트형", ["btop"]],
   ["동양 역학형", ["manse", "saju"]], ["서양 점성형", ["zodiac", "astro"]], ["무작위", ["random"]]];
 const optLabel = k => STRATS[k][0] + (PROFILE.includes(k) ? " (내 정보 필요)" : "");
 console.assert(GROUPS.flatMap(g => g[1]).sort().join() === SKEYS.slice().sort().join(), "전략 묶음 누락");
@@ -764,7 +767,12 @@ function renderRows() {
     <div class="balls" id="res${i}" style="grid-column:2"></div><div class="why" id="why${i}"></div></div>`).join("");
   $("sets").querySelectorAll("select").forEach(el => el.onchange = () => { choice[+el.dataset.i] = el.value; $("allStrat").value = ""; $("planNote").innerHTML = ""; });
 }
-$("gameCount").onchange = () => { if ($("allStrat").value === "__saju") applySajuPlan(); else renderRows(); };
+$("gameCount").onchange = () => {
+  const v = $("allStrat").value;
+  if (v === "__saju") applySajuPlan();
+  else if (v) { choice = Array(+$("gameCount").value).fill(v); renderRows(); $("allStrat").value = v; } // 전체 전략을 고른 상태면 늘어난 게임도 같은 전략
+  else renderRows();
+};
 $("allStrat").onchange = () => {
   const v = $("allStrat").value; $("planNote").innerHTML = "";
   if (v === "__saju") applySajuPlan();
@@ -772,10 +780,25 @@ $("allStrat").onchange = () => {
 };
 renderRows();
 
+// 백테스트 3+ 비율 상위 5개 전략 (무작위 기준·자기 자신 제외, 딥러닝은 3+ 기록이 있을 때만)
+function btRanking() {
+  const c = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].n)
+    .map(k => ({ k, r3: BT[k].h3 / BT[k].n, mean: BT[k].hit / BT[k].n }));
+  if (dl && dl.h3 != null) c.push({ k: "deep", r3: dl.h3 / dl.n, mean: dl.hit / dl.n, recent: true });
+  return c.sort((a, b) => b.r3 - a.r3 || b.mean - a.mean).slice(0, 5);
+}
 function generate() {
   const seed = (Math.random() * 2 ** 31) | 0; current = [];
-  choice.forEach((k, i) => {
-    const [name, , fn] = STRATS[k];
+  const ranking = choice.includes("btop") ? btRanking() : [];
+  let btIdx = 0;
+  choice.forEach((k0, i) => {
+    let k = k0, label = "";
+    if (k0 === "btop") {
+      if (!ranking.length) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = "<b>백테스트형</b> · 백테스트를 계산 중입니다. 잠시 후 다시 누르세요."; return; }
+      const j = btIdx++ % ranking.length, r = ranking[j]; k = r.k;
+      label = `백테스트형 · ${j + 1}위 ${STRATS[k][0]} (3+ ${(r.r3 * 100).toFixed(2)}%${r.recent ? ", 최근 100회" : ""})`;
+    }
+    const [name0, , fn] = STRATS[k], name = label || name0;
     if (k === "deep" && !dl) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 이번 회차 딥러닝 결과가 아직 없습니다. 잠시 후 다시 시도하세요.`; return; }
     const prof = PROFILE.includes(k);
     if (prof && !saju) {
@@ -938,7 +961,7 @@ if (dl) renderDL();
 const BT_START = 101, BT = {};
 const drawDay = d => new Date(+d.ymd.slice(0, 4), +d.ymd.slice(4, 6) - 1, +d.ymd.slice(6), 12);
 function runBacktest(keys, done) {
-  const res = Object.fromEntries(keys.map(k => [k, { hit: 0, h3: 0, h4: 0, n: 0 }]));
+  const res = Object.fromEntries(keys.map(k => [k, { hit: 0, h3: 0, h4: 0, n: 0, g: new Int8Array(N * 5).fill(-1) }]));
   const fr = Array(46).fill(0), ls = Array(46).fill(0), tr = Array.from({ length: 46 }, () => Array(46).fill(0)), oc = Array(46).fill(0);
   const sumsH = [], past = new Set();
   let i = 0;
@@ -963,7 +986,7 @@ function runBacktest(keys, done) {
           for (let g = 0; g < 5; g++) {
             let s, tries = 0;
             do s = fn(R, cx); while (++tries < 500 && !okShape(s, cx));
-            const h = s.filter(x => win.has(x)).length, r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4;
+            const h = s.filter(x => win.has(x)).length, r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4; r.g[i * 5 + g] = h;
           }
         }
       }
@@ -977,6 +1000,23 @@ function runBacktest(keys, done) {
     if (i < N) setTimeout(step, 0); else done(res);
   }
   step();
+}
+// 백테스트형 검증: 회차마다 '그 이전까지의' 3+ 순위 상위 5개 전략을 골라 그 회차 결과를 씀 (미래 순위 사용 안 함)
+function computeMeta() {
+  const keys = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].g);
+  delete BT.btop;
+  if (keys.length < 5) return;
+  const cum = Object.fromEntries(keys.map(k => [k, { h3: 0, hit: 0, n: 0 }])), res = { hit: 0, h3: 0, h4: 0, n: 0 };
+  const rate = k => cum[k].h3 / cum[k].n, mean = k => cum[k].hit / cum[k].n;
+  for (let i = 0; i < N; i++) {
+    if (D[i].no < BT_START) continue;
+    if (keys.every(k => cum[k].n >= 100)) { // 전략마다 100게임(20회) 이상 쌓인 뒤부터
+      keys.slice().sort((a, b) => rate(b) - rate(a) || mean(b) - mean(a)).slice(0, 5).forEach((k, g) => {
+        const h = BT[k].g[i * 5 + g]; res.n++; res.hit += h; res.h3 += h >= 3; res.h4 += h >= 4; });
+    }
+    for (const k of keys) for (let g = 0; g < 5; g++) { const h = BT[k].g[i * 5 + g]; if (h < 0) continue; const c = cum[k]; c.n++; c.hit += h; c.h3 += h >= 3; }
+  }
+  BT.btop = res;
 }
 // 양측 유의수준 0.05를 비교 전략 수로 나눈 기준 z (본페로니)
 const zCrit = m => { let lo = 1.5, hi = 5; for (let t = 0; t < 40; t++) { const mid = (lo + hi) / 2; (1 - Phi(mid)) * 2 * m > 0.05 ? lo = mid : hi = mid; } return hi; };
@@ -993,12 +1033,13 @@ function renderBT() {
     전략을 ${m}개 비교하므로 |z| &gt; ${zc.toFixed(2)}여야 유의합니다.`;
   $("bt").innerHTML = "<tr><th>전략</th><th>평균 일치</th><th>3개+</th><th>4개+</th><th>z</th><th>판정</th></tr>" + rows.map(k => {
     const name = STRATS[k][0];
-    if (k === "deep") { const mean = dl.hit / dl.n, z = (mean - MU) / Math.sqrt(VAR / dl.n);
-      return `<tr><td>${name} <small class="note">최근 100회만</small></td><td>${mean.toFixed(3)}</td><td>-</td><td>-</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`; }
+    if (k === "deep") { const mean = dl.hit / dl.n, z = (mean - MU) / Math.sqrt(VAR / dl.n), has3 = dl.h3 != null;
+      return `<tr><td>${name} <small class="note">최근 100회만</small></td><td>${mean.toFixed(3)}</td><td>${has3 ? (dl.h3 / dl.n * 100).toFixed(2) + "%" : "-"}</td><td>${has3 ? dl.h4 : "-"}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`; }
     const r = BT[k];
     if (!r) return `<tr><td>${name}</td><td colspan="5" class="note" style="text-align:left">${saju ? "계산 중…" : "내 정보 입력 후 계산됩니다"}</td></tr>`;
     const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n);
-    const who = PROFILE.includes(k) && saju ? ` <small class="note">${saju.name ? esc(saju.name) + " 기준" : "내 사주 기준"}</small>` : "";
+    const who = PROFILE.includes(k) && saju ? ` <small class="note">${saju.name ? esc(saju.name) + " 기준" : "내 사주 기준"}</small>`
+      : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 5개 사용${BT.saju ? ", 사주 계열 포함" : ""}</small>` : "";
     return `<tr><td>${name}${who}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`;
   }).join("");
 }
@@ -1006,13 +1047,13 @@ let btBusy = false, btProfileKey = null;
 function backtestProfile() { // 내 정보가 바뀌면 사주·별자리·점성술형만 다시 계산
   if (!saju || btBusy || btProfileKey === saju.key) return;
   const key = saju.key; btBusy = true; PROFILE.forEach(k => delete BT[k]); renderBT();
-  runBacktest(PROFILE, res => { btBusy = false; btProfileKey = key; if (saju && saju.key === key) Object.assign(BT, res); renderBT(); backtestProfile(); });
+  runBacktest(PROFILE, res => { btBusy = false; btProfileKey = key; if (saju && saju.key === key) Object.assign(BT, res); computeMeta(); renderBT(); backtestProfile(); });
 }
-const baseKeys = SKEYS.filter(k => !PROFILE.includes(k) && k !== "deep" && (k !== "manse" || window.Solar));
+const baseKeys = SKEYS.filter(k => !PROFILE.includes(k) && k !== "deep" && k !== "btop" && (k !== "manse" || window.Solar));
 window.btReady = true;
 renderBT();
 btBusy = true;
-runBacktest(baseKeys, res => { Object.assign(BT, res); btBusy = false; renderBT(); backtestProfile(); });
+runBacktest(baseKeys, res => { Object.assign(BT, res); btBusy = false; computeMeta(); renderBT(); backtestProfile(); });
 </script>
 </body>
 </html>

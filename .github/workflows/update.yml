@@ -11,6 +11,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force_dl:
+        description: "딥러닝을 새 회차가 없어도 다시 학습"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -35,11 +40,11 @@ jobs:
         run: python fetch_rich.py
       - name: 딥러닝(LSTM) 학습 (새 회차가 있을 때만)
         run: |
-          if python -c "import csv,json;n=sum(1 for r in csv.reader(open('lotto645.csv',encoding='utf-8-sig')) if r and r[0].isdigit());d=json.loads(open('dl.js',encoding='utf-8').read().split('=',1)[1].rstrip().rstrip(';'));raise SystemExit(0 if d['last']==n else 1)"; then
+          if [ "${{ inputs.force_dl }}" != "true" ] && python -c "import csv,json;n=sum(1 for r in csv.reader(open('lotto645.csv',encoding='utf-8-sig')) if r and r[0].isdigit());d=json.loads(open('dl.js',encoding='utf-8').read().split('=',1)[1].rstrip().rstrip(';'));raise SystemExit(0 if d['last']==n else 1)"; then
             echo "dl.js가 이미 최신 회차라 학습 생략"
           else
             pip install --quiet numpy torch --index-url https://download.pytorch.org/whl/cpu
-            python dl_train.py
+            python dl_train.py --force
           fi
       - name: 새 회차가 있으면 저장소에 커밋
         run: |

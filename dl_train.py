@@ -69,19 +69,20 @@ def predict(m, end):
 # 1) 홀드아웃 검증: 상위 30개를 겹치지 않게 5게임으로 나눠 실제와 비교 (백테스트 표와 같은 방식)
 cut = N - HOLD
 m1 = train(cut)
-hit = n = 0
+hit = n = h3 = h4 = 0
 for i in range(cut, N):
     order = list(np.argsort(-predict(m1, i), kind="stable") + 1)
     win = set(draws[i])
     for g in range(5):
-        hit += sum(order[g + j * 5] in win for j in range(6)); n += 1
+        h = sum(order[g + j * 5] in win for j in range(6))
+        hit += h; n += 1; h3 += h >= 3; h4 += h >= 4
 mean = hit / n
 z = (mean - 0.8) / math.sqrt(0.8 * (39 / 45) * (39 / 44) / n)
 print(f"홀드아웃 {cut + 1}~{N}회: 평균 일치 {mean:.3f} (무작위 0.800), z={z:+.2f}")
 
 # 2) 전체로 학습 -> 다음 회차
 p = predict(train(N), N)
-res = {"last": N, "p": [round(float(v), 5) for v in p], "hit": hit, "n": n,
+res = {"last": N, "p": [round(float(v), 5) for v in p], "hit": hit, "n": n, "h3": h3, "h4": h4,
        "model": f"LSTM({UNITS}) 창 {W}회, {EPOCHS} epoch, PyTorch {torch.__version__}", "trained": date.today().isoformat()}
 with open(OUT, "w", encoding="utf-8") as f:
     f.write("window.LOTTO_DL=" + json.dumps(res, ensure_ascii=False, separators=(",", ":")) + ";\n")

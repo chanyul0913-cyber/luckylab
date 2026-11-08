@@ -1127,8 +1127,8 @@ function computeMeta() {
   for (let i = 0; i < N; i++) {
     if (D[i].no < BT_START) continue;
     if (keys.every(k => cum[k].n >= 100)) { // 전략마다 100게임(20회) 이상 쌓인 뒤부터
-      keys.slice().sort((a, b) => rate(b) - rate(a) || mean(b) - mean(a)).slice(0, 5).forEach((k, g) => {
-        const h = BT[k].g[i * 5 + g]; res.n++; res.hit += h; res.h3 += h >= 3; res.h4 += h >= 4; });
+      keys.slice().sort((a, b) => rate(b) - rate(a) || mean(b) - mean(a)).slice(0, 10).forEach((k, j) => { // 실제 추천과 같게 1~10위로 1게임씩 (전략마다 회차당 5게임을 저장해 둠)
+        const h = BT[k].g[i * 5 + j % 5]; res.n++; res.hit += h; res.h3 += h >= 3; res.h4 += h >= 4; });
     }
     for (const k of keys) for (let g = 0; g < 5; g++) { const h = BT[k].g[i * 5 + g]; if (h < 0) continue; const c = cum[k]; c.n++; c.hit += h; c.h3 += h >= 3; }
   }
@@ -1155,7 +1155,7 @@ function renderBT() {
     if (!r) return `<tr><td>${name}</td><td colspan="5" class="note" style="text-align:left">${saju ? "계산 중…" : "내 정보 입력 후 계산됩니다"}</td></tr>`;
     const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n);
     const who = PROFILE.includes(k) && saju ? ` <small class="note">${saju.name ? esc(saju.name) + " 기준" : "내 사주 기준"}</small>`
-      : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 5개 사용${BT.saju ? ", 사주 계열 포함" : ""}</small>` : "";
+      : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 10개로 1게임씩${BT.saju ? ", 사주 계열 포함" : ""}</small>` : "";
     return `<tr><td>${name}${who}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`;
   }).join("");
   updateFoldSum();

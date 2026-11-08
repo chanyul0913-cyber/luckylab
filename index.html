@@ -822,7 +822,7 @@ STRATS.celeb = ["유명인사주형", "아래 유명인·세계 부자 TOP10 사
 const LIVE = { qlo: q(0.1), qhi: q(0.9), prev: LAST.n, pastSet, freq, c50, overdue, markovW, qW,
   get sajuW() { return saju.w; }, get zw() { return saju.west.zw; }, get aw() { return saju.west.aw; }, get manseW() { return manse().w; },
   get celebPlan() { return celebPlan(); } };
-STRATS.btop = ["백테스트형", "아래 백테스트 표에서 3개 이상 맞힌 비율(3+)이 높은 전략 1~5위를 순서대로 게임에 배정 (6게임 이상이면 1위부터 반복, 동률이면 평균 일치가 높은 쪽). 딥러닝은 3+ 기록이 있을 때 최근 100회 기준으로 함께 비교. 순위 차이는 우연 범위이며, 이 방식 자체의 성적도 백테스트 표에 나옵니다", null];
+STRATS.btop = ["백테스트형", "아래 백테스트 표에서 3개 이상 맞힌 비율(3+)이 높은 전략을 순위대로 게임에 배정: 1게임=1위, 2게임=2위 … 10게임=10위 (반복 없음, 동률이면 평균 일치가 높은 쪽). 후보 전략 수보다 게임이 많으면 남는 게임은 비워 둠. 딥러닝은 3+ 기록이 있을 때 최근 100회 기준으로 함께 비교. 순위 차이는 우연 범위이며, 이 방식 자체의 성적도 백테스트 표에 나옵니다", null];
 const PROFILE = ["saju", "zodiac", "astro"]; // 내 정보가 필요한 전략
 const SKEYS = Object.keys(STRATS);
 const GROUPS = [["통계형", ["balance", "recent", "overdue", "spread"]], ["AI·모델형", ["deep", "markov", "quantum"]], ["백테스트형", ["btop"]],
@@ -892,7 +892,7 @@ function btRanking() {
   const c = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].n)
     .map(k => ({ k, r3: BT[k].h3 / BT[k].n, mean: BT[k].hit / BT[k].n }));
   if (dl && dl.h3 != null) c.push({ k: "deep", r3: dl.h3 / dl.n, mean: dl.hit / dl.n, recent: true });
-  return c.sort((a, b) => b.r3 - a.r3 || b.mean - a.mean).slice(0, 5);
+  return c.sort((a, b) => b.r3 - a.r3 || b.mean - a.mean).slice(0, 10); // 게임 수(최대 10)만큼 1~10위
 }
 function generate() {
   const seed = (Math.random() * 2 ** 31) | 0; current = [];
@@ -902,7 +902,9 @@ function generate() {
     let k = k0, label = "";
     if (k0 === "btop") {
       if (!ranking.length) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = "<b>백테스트형</b> · 백테스트를 계산 중입니다. 잠시 후 다시 누르세요."; return; }
-      const j = btIdx++ % ranking.length, r = ranking[j]; k = r.k;
+      const j = btIdx++, r = ranking[j]; // N번째 백테스트형 게임 = N위 전략 (반복 없음)
+      if (!r) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>백테스트형</b> · ${j + 1}위 전략이 없습니다. 지금 비교할 수 있는 전략은 ${ranking.length}개입니다${saju ? "" : " (내 정보를 저장하면 사주·별자리·점성술형이 후보에 추가됩니다)"}.`; return; }
+      k = r.k;
       label = `백테스트형 · ${j + 1}위 ${STRATS[k][0]} (3+ ${(r.r3 * 100).toFixed(2)}%${r.recent ? ", 최근 100회" : ""})`;
     }
     const [name0, , fn] = STRATS[k], name = label || name0;

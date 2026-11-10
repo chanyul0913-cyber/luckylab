@@ -287,6 +287,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
       <li>오른쪽 <b>유명인 사주</b>에서 이름을 누르면 그 사람 생년월일이 자동으로 들어가고, 바로 아래에 나오는 <b>[받기]</b>를 누르면 그 사주에 맞춘 번호가 한 번에 나옵니다.</li>
       <li>가족·친구 사주는 이름을 넣고 <b>'목록에 추가'</b>해 두면 다음에 눌러서 불러올 수 있습니다.</li>
       <li>입력한 정보는 <b>이 휴대폰(브라우저)에만 저장</b>되고 어디에도 전송되지 않습니다.</li>
+      <li>내 목록은 <b>[목록 내보내기]</b>로 파일에 백업해 둘 수 있습니다. 브라우저를 바꾸거나 초기화한 뒤에는 <b>[목록 불러오기]</b>로 그 파일을 열면 되살아납니다.</li>
     </ul>
 
     <h3>자주 묻는 질문</h3>
@@ -318,6 +319,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
       <button id="copy" disabled>번호 복사</button>
       <span class="toast" id="toast" role="status"></span>
     </div>
+    <details id="celebRank" style="margin-top:10px" hidden><summary>🏆 이번 주 유명인 운세 순위 (1~10위)</summary><div class="note" id="celebRankBody"></div></details>
     <details style="margin-top:10px"><summary>전략 설명</summary><div id="stratHelp" class="note"></div></details>
   </section>
   <section class="card" id="sajuCard">
@@ -351,6 +353,9 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
       <p class="note">왼쪽에 입력한 사주를 이름으로 저장해 두고 눌러서 불러옵니다.</p>
       <div class="chips" id="myList"></div>
       <button type="button" id="addMine">지금 입력한 사주를 목록에 추가</button>
+      <button type="button" id="backupMine">목록 내보내기</button>
+      <button type="button" id="importMine">목록 불러오기</button>
+      <input type="file" id="restoreMine" accept=".json,application/json" hidden>
     </div>
     </div>
     <div id="sajuOut"></div>
@@ -379,7 +384,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     <h2>구조 검정 — 과거 번호에 숨은 패턴이 있나</h2>
     <table id="tests"></table>
     <h2 style="margin-top:18px;font-size:15px">홀수 개수 분포</h2>
-    <div id="oddChart"></div>
+    <div id="oddChart" role="img" aria-label="홀수 개수(0~6개)별 실제 회차 수와 무작위 이론값 비교 그래프"></div>
     <div class="legend"><span><i></i>실제 회차 수</span><span><i class="t"></i>무작위 이론값</span></div>
     </div>
     <div class="sub">
@@ -470,6 +475,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 <script src="data.js"></script>
 <script src="dl.js"></script>
 <script src="rich.js"></script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js"></script>
 <script>
 "use strict";
@@ -991,6 +997,16 @@ function generate() {
   });
   $("copy").disabled = !current.length;
   if (choice.some(k => PROFILE.includes(k)) && !saju) $("sjY").focus();
+  renderCelebRank();
+}
+// 유명인사주형이 쓰는 이번 주 운세 순위표 (추첨일 토요일 기준 1~10위)
+function renderCelebRank() {
+  const cp = celebPlan();
+  if (!cp) return;
+  $("celebRank").hidden = false;
+  $("celebRankBody").innerHTML = cp.top.map((t, j) =>
+    `${j + 1}위 <b>${esc(t.name)}</b> — ${t.r.grade} · 총+${t.r.g} · 재물+${t.r.wealth} · 행운지수 ${Math.min(97, Math.max(23, 62 + t.r.g * 5))}`).join("<br>")
+    + `<br>점수는 SAJOO식 오늘의 운세 계산(총점+재물운)이며, 번호 추천 시 누르는 순간마다 이 순위대로 게임에 배정됩니다.`;
 }
 $("again").onclick = generate;
 async function copyNumbers(toast) {
@@ -1125,7 +1141,42 @@ $("addMine").onclick = () => {
 };
 renderPresets();
 
+// 내 목록 백업·복원: 브라우저 초기화·기기 바꾸기에 대비해 파일로 내보내고 다시 불러온다
+$("backupMine").onclick = () => {
+  const data = { type: "robunso-saju-list", saved: new Date().toISOString().slice(0, 10), list: myList };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
+  a.download = `로분소-사주목록-${data.saved}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  $("sjMsg").textContent = "목록 파일을 내려받았어요 — 잘 보관해 두세요";
+};
+$("importMine").onclick = () => $("restoreMine").click();
+$("restoreMine").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result), items = Array.isArray(d) ? d : d.list;
+      if (!Array.isArray(items)) throw new Error("로분소 목록 파일이 아닙니다");
+      const key = q => (q.name || "") + "|" + q.y + "|" + q.m + "|" + q.d;
+      let added = 0;
+      for (const p of items) {
+        if (!p || !p.y || !p.m || !p.d) continue;
+        const q = { name: String(p.name || "").slice(0, 20), cal: p.cal === "lunar" ? "lunar" : "solar", leap: !!p.leap, y: +p.y, m: +p.m, d: +p.d, h: p.h ?? "", mi: p.mi ?? "0" };
+        calcSaju(q); // 존재하지 않는 날짜는 여기서 걸러짐
+        if (myList.some(x => key(x) === key(q))) continue;
+        myList.push(q); added++;
+      }
+      saveList(); renderPresets();
+      $("sjMsg").textContent = added ? `${added}명을 목록에 불러왔어요` : "이미 목록에 있는 사람들이라 새로 추가된 게 없어요";
+    } catch (err) { $("sjMsg").textContent = "불러오기 실패 — " + err.message; }
+    e.target.value = "";
+  };
+  r.readAsText(f);
+};
+
 if (dl) renderDL();
+renderCelebRank(); // 열자마자 이번 주 유명인 운세 순위를 준비
 
 // ---------- 백테스트 (각 회차는 직전 회차까지만 사용) ----------
 // 실제 추천과 같은 전략 함수·같은 형태 필터를, 회차마다 그 이전 데이터로 만든 기준값으로 돌림 (미래 데이터 차단)
@@ -1155,7 +1206,8 @@ function runBacktest(keys, done) {
   const sumsH = [], past = new Set();
   let i = 0;
   function step() {
-    const until = Math.min(N, i + 60), t0 = performance.now();
+    // 다른 앱을 보고 있으면(화면 숨김) 브라우저가 타이머를 1초에 1번으로 늦춘다 → 그때는 덩어리를 크게 해 몇 배 빨리 끝내고, 보고 있을 때는 잘게 나눠 화면이 멈추지 않게 한다
+    const hidden = document.hidden, until = Math.min(N, i + (hidden ? 400 : 60)), t0 = performance.now();
     for (; i < until; i++) {
       const d = D[i];
       if (d.no >= BT_START) {
@@ -1188,7 +1240,7 @@ function runBacktest(keys, done) {
       d.n.forEach(x => { fr[x]++; ls[x] = d.no; });
       if (i) for (const a of D[i - 1].n) { oc[a]++; for (const b of d.n) tr[a][b]++; }
       const sm = d.n.reduce((a, b) => a + b, 0); sumsH.splice(sumsH.findIndex(v => v > sm) >>> 0, 0, sm); past.add(d.n.join(","));
-      if (performance.now() - t0 > 40) { i++; break; } // 화면이 멈추지 않게 나눠서 계산
+      if (performance.now() - t0 > (hidden ? 250 : 40)) { i++; break; } // 화면이 멈추지 않게 나눠서 계산
     }
     $("btProg").textContent = i < N ? `계산 중… ${Math.round(i / N * 100)}%` : "";
     if (i < N) setTimeout(step, 0); else done(res);

@@ -4,38 +4,75 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>로분소</title>
+<meta name="description" content="동행복권 로또 6/45 실제 당첨번호 전 회차를 분석해 통계·AI·사주 전략으로 번호를 뽑아 주는 로분소">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
 :root{
-  --bg:#f6f5f1;--card:#ffffff;--ink:#1d1d1f;--ink2:#55565c;--muted:#8a8b91;--line:#e4e2dc;
-  --accent:#b8860b;--bar:#3b6fb6;--bar2:#9cb6dc;--good:#2e7d4f;--warn:#b45309;
+  --bg:#f3f5f9;--card:#ffffff;--ink:#111827;--ink2:#4b5563;--muted:#6b7280;--line:#e4e7ee;
+  --brand:#1e3a8a;--brand-ink:#ffffff;--accent:#d4a017;--accent-text:#8a6406;--accent-ink:#1a1300;
+  --bar:#3b6fb6;--bar2:#9cb6dc;--good:#2e7d4f;--warn:#b45309;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 2px 8px rgba(16,24,40,.06);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#121318;--card:#1c1d24;--ink:#ecebe6;--ink2:#b4b3ad;--muted:#85858c;--line:#2e2f38;
-  --accent:#e0b44c;--bar:#6f9be0;--bar2:#3b4f72;--good:#5cc28a;--warn:#f0a35a;}}
+  --bg:#0f1218;--card:#1a1e27;--ink:#eceef2;--ink2:#b6bac4;--muted:#9aa0ab;--line:#2c313c;
+  --brand:#8fb0ff;--brand-ink:#0f1218;--accent:#e0b44c;--accent-text:#e8c25e;--accent-ink:#1a1300;
+  --bar:#6f9be0;--bar2:#3b4f72;--good:#5cc28a;--warn:#f0a35a;--shadow:none;}}
 :root[data-theme="dark"]{
-  --bg:#121318;--card:#1c1d24;--ink:#ecebe6;--ink2:#b4b3ad;--muted:#85858c;--line:#2e2f38;
-  --accent:#e0b44c;--bar:#6f9be0;--bar2:#3b4f72;--good:#5cc28a;--warn:#f0a35a;}
+  --bg:#0f1218;--card:#1a1e27;--ink:#eceef2;--ink2:#b6bac4;--muted:#9aa0ab;--line:#2c313c;
+  --brand:#8fb0ff;--brand-ink:#0f1218;--accent:#e0b44c;--accent-text:#e8c25e;--accent-ink:#1a1300;
+  --bar:#6f9be0;--bar2:#3b4f72;--good:#5cc28a;--warn:#f0a35a;--shadow:none;}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
-main{max-width:760px;margin:0 auto;padding:24px 16px 64px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Pretendard Variable",Pretendard,-apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  -webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+main{max-width:760px;margin:0 auto;padding:20px 16px 32px}
 h1{font-size:26px;margin:0 0 4px}
-h2{font-size:18px;margin:0 0 4px}
-.sub{color:var(--ink2);margin:0 0 20px;font-size:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+h2{font-size:18px;margin:0 0 4px;letter-spacing:-.02em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+/* 머리글 */
+.top{background:#1e3a8a;color:#fff} /* 머리글은 밝은·어두운 모드 모두 진한 남색 */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .top{background:#172554}}
+:root[data-theme="dark"] .top{background:#172554}
+.top .in{max-width:760px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none;margin-right:auto}
+.brand svg{flex:none}
+.brand b{font-size:21px;letter-spacing:-.03em}
+.brand small{display:block;font-size:12px;opacity:.8;font-weight:500;margin-top:-2px}
+.top nav{display:flex;gap:4px;flex-wrap:wrap}
+.top nav a{color:inherit;text-decoration:none;font-size:14px;font-weight:600;padding:6px 10px;border-radius:8px;opacity:.9}
+.top nav a:hover{background:rgba(255,255,255,.14);opacity:1}
+.top nav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.meta{color:var(--ink2);margin:0 0 16px;font-size:13px}
+/* 바닥글 */
+.foot{max-width:760px;margin:0 auto;padding:8px 16px 48px;color:var(--ink2);font-size:13px;line-height:1.7}
+.foot .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;border-top:1px solid var(--line);padding-top:20px}
+@media (max-width:640px){.foot .cols{grid-template-columns:1fr}}
+.foot h4{margin:0 0 4px;font-size:13px;color:var(--ink)}
+.foot p{margin:0}
+.foot a{color:var(--ink2)}
+.foot .copy{margin-top:16px}
 .note{color:var(--muted);font-size:13px;margin:6px 0 0}
 .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .balls{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .ball{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
-  font-weight:700;font-size:15px;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.35);flex:none}
+  font-weight:800;font-size:15px;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.35);flex:none;font-variant-numeric:tabular-nums;
+  background-image:radial-gradient(circle at 32% 28%,rgba(255,255,255,.5),rgba(255,255,255,0) 52%);
+  box-shadow:inset 0 -3px 5px rgba(0,0,0,.18),0 1px 2px rgba(0,0,0,.15)}
 .b1{background:#e6a400}.b2{background:#2f7fd0}.b3{background:#d9453b}.b4{background:#7d7d7d}.b5{background:#3ea34a}
 .plus{color:var(--muted);font-weight:700}
 .set{display:grid;grid-template-columns:24px 1fr;gap:4px 10px;padding:12px 0;border-top:1px solid var(--line)}
 .set:first-of-type{border-top:0}
 .set .idx{color:var(--muted);font-weight:700;padding-top:7px}
 .set .why{grid-column:2;color:var(--ink2);font-size:13px}
-button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 16px;cursor:pointer}
-button.primary{background:var(--accent);border-color:var(--accent);color:#1a1300;font-weight:700}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 16px;cursor:pointer;
+  transition:transform .12s ease,box-shadow .12s ease,background-color .12s ease}
+button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 2px 8px rgba(16,24,40,.12)}
+button:active:not(:disabled){transform:translateY(1px) scale(.98);box-shadow:none}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:700}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chip{transition:transform .12s ease}
+.chip:hover{transform:translateY(-1px)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}button:hover,button:active,.chip:hover{transform:none!important}}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--line)}
 th:first-child,td:first-child{text-align:left}
@@ -83,7 +120,7 @@ select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 .qbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:480px){.qbtns{grid-template-columns:1fr}}
 button.big{font-size:17px;padding:16px 12px;border-radius:12px}
-button.alt{background:#2f6fb0;border-color:#2f6fb0;color:#fff}
+button.alt{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .linkish{border:0;background:none;color:var(--ink2);padding:10px 0 0;font-size:14px;text-decoration:underline}
 .cq{border:2px solid var(--accent);border-radius:12px;padding:12px;margin:8px 0}
 .cq .balls{margin:6px 0}
@@ -97,13 +134,13 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 .slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
 .slides::-webkit-scrollbar{display:none}
 .slide{flex:0 0 100%;scroll-snap-align:start;padding:16px;text-align:center}
-.step{font-weight:700;color:var(--accent);margin:0 0 10px}
+.step{font-weight:700;color:var(--accent-text);margin:0 0 10px}
 .phone{border:2px solid var(--line);border-radius:18px;padding:14px;margin:0 auto;max-width:290px;display:flex;flex-direction:column;gap:8px;align-items:center;background:var(--bg)}
 .mk{font-weight:700;font-size:14px}
 .mk .x{color:#d9453b;font-size:18px;margin-left:4px}
 .balls.sm .ball{width:28px;height:28px;font-size:12px}
-.fakebtn{position:relative;background:var(--accent);color:#1a1300;font-weight:700;border-radius:10px;padding:10px 14px;width:100%;font-size:14px}
-.fakebtn.alt{background:#2f6fb0;color:#fff}
+.fakebtn{position:relative;background:var(--brand);color:var(--brand-ink);font-weight:700;border-radius:10px;padding:10px 14px;width:100%;font-size:14px}
+.fakebtn.alt{background:var(--accent);color:var(--accent-ink)}
 .fakebtn.small{width:auto;padding:6px 14px}
 .fakesel{position:relative;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:14px}
 .phone .chips{justify-content:center;margin:0}
@@ -119,7 +156,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 .fold summary{cursor:pointer;list-style:none;font-size:16px;line-height:1.5}
 .fold summary::-webkit-details-marker{display:none}
 .fold .foldSum{display:block;margin-top:6px;font-size:14px;color:var(--good)}
-.fold .more{display:inline-block;margin-top:6px;font-size:13px;color:var(--accent);font-weight:700}
+.fold .more{display:inline-block;margin-top:6px;font-size:13px;color:var(--accent-text);font-weight:700}
 .fold[open] .more{display:none}
 .fold .sub{border-top:1px solid var(--line);margin-top:16px;padding-top:16px}
 .updBar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;
@@ -137,7 +174,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;font-size:13px;line-height:1.3;text-align:left}
 .chip small{color:var(--muted)}
 .catRow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%}
-.catRow .cat{width:100%;font-size:12px;font-weight:700;color:var(--accent);margin-top:4px}
+.catRow .cat{width:100%;font-size:12px;font-weight:700;color:var(--accent-text);margin-top:4px}
 #celebs{max-height:340px;overflow-y:auto;padding-right:4px}
 .chip.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .chipWrap{display:inline-flex}
@@ -161,9 +198,22 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
   <button id="updGo" class="primary">새로고침</button>
   <button id="updX" aria-label="닫기">✕</button>
 </div>
+<header class="top">
+  <div class="in">
+    <a class="brand" href="./" aria-label="로분소 처음으로">
+      <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
+        <circle cx="14" cy="18" r="12" fill="#d4a017"/><circle cx="24" cy="18" r="11" fill="#d9453b" stroke="#1e3a8a" stroke-width="2"/>
+        <circle cx="10.5" cy="13.5" r="3.5" fill="#fff" opacity=".5"/><text x="24" y="22.5" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="sans-serif">45</text>
+      </svg>
+      <span><b>로분소</b><small>로또 6/45 데이터 분석소</small></span>
+    </a>
+    <nav aria-label="주요 메뉴">
+      <a href="#pick">번호 뽑기</a><a href="#sajuCard">유명인·내 사주</a><a href="#statsFold">검정·백테스트</a>
+    </nav>
+  </div>
+</header>
 <main>
-  <h1>로분소 <span class="tag">로또 6/45 실제 데이터 분석</span></h1>
-  <p class="sub" id="meta">데이터 불러오는 중…</p>
+  <p class="meta" id="meta">데이터 불러오는 중…</p>
 
   <section class="card quick">
     <h2>무엇을 할까요?</h2>
@@ -254,7 +304,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 
   <section class="card" id="latest"></section>
 
-  <section class="card">
+  <section class="card" id="pick">
     <h2>번호 뽑기 <span class="tag" id="target"></span></h2>
     <p class="note">게임 수와 게임별 전략을 고른 뒤 '번호 뽑기'를 누르세요. 어느 전략이든 1등 확률은 똑같이 1/8,145,060입니다.</p>
     <div class="row" style="margin:12px 0">
@@ -347,6 +397,14 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     추천 조합의 유일한 수학적 이점은 <b>다른 사람과 덜 겹치는 조합</b>이라 당첨 시 나눠 가질 사람이 적다는 점뿐입니다. 재미와 참고용으로만 쓰세요.</p>
   </section>
 </main>
+<footer class="foot">
+  <div class="cols">
+    <div><h4>이용 안내</h4><p>로또는 매 회차 독립된 무작위 추첨입니다. 이 사이트의 어떤 전략도 1등 확률(8,145,060분의 1)을 높이지 않으며, 재미와 참고용입니다.</p></div>
+    <div><h4>데이터 출처</h4><p>당첨번호·당첨금: <a href="https://www.dhlottery.co.kr/" rel="noopener" target="_blank">동행복권</a> 공식 발표<br>세계 부자 순위: 포브스<br><span id="footData"></span></p></div>
+    <div><h4>개인정보</h4><p>입력한 사주·내 목록은 이 기기의 브라우저에만 저장되며 어디로도 전송되지 않습니다.</p></div>
+  </div>
+  <p class="copy">© 2026 로분소 · 동행복권과 무관한 개인 분석 사이트입니다.</p>
+</footer>
 <div id="tip"></div>
 <dialog id="pics" aria-label="그림으로 보는 사용법">
   <div class="picsTop"><b>그림으로 보는 사용법</b><button id="picsClose" aria-label="닫기">✕</button></div>
@@ -451,6 +509,9 @@ const pastSet = new Set(D.map(d => d.n.join(",")));
 
 $("meta").textContent = `동행복권 제1회(${fmtDate(D[0].ymd)}) ~ 제${LAST.no}회(${fmtDate(LAST.ymd)}) 실제 당첨번호 ${N}회 분석`;
 $("target").textContent = `제${LAST.no + 1}회 대상`;
+$("footData").textContent = `마지막 반영: 제${LAST.no}회 (${fmtDate(LAST.ymd)})`;
+// 메뉴에서 '검정·백테스트'를 누르면 접힌 카드를 펼쳐서 보여 줌
+document.querySelector('.top nav a[href="#statsFold"]').addEventListener("click", () => { $("statsFold").open = true; });
 const drawDateTxt = (() => { const d = new Date(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + 7);
   return `${d.getMonth() + 1}월 ${d.getDate()}일 토요일 20:35`; })();
 $("latest").innerHTML = `<h2>지난 회차 실제 당첨번호 — 제${LAST.no}회 <span class="tag">${fmtDate(LAST.ymd)} 추첨 완료</span></h2>
@@ -831,7 +892,7 @@ const optLabel = k => STRATS[k][0] + (PROFILE.includes(k) ? " (내 정보 필요
 console.assert(GROUPS.flatMap(g => g[1]).sort().join() === SKEYS.slice().sort().join(), "전략 묶음 누락");
 const optHtml = sel => GROUPS.map(([g, ks]) => `<optgroup label="${g}">`
   + ks.map(k => `<option value="${k}"${k === sel ? " selected" : ""}>${optLabel(k)}</option>`).join("") + "</optgroup>").join("");
-$("stratHelp").innerHTML = GROUPS.map(([g, ks]) => `<b style="color:var(--accent)">${g}</b><br>` + ks.map(k => `<b>${optLabel(k)}</b> — ${STRATS[k][1]}`).join("<br>")).join("<br><br>") + "<br>"
+$("stratHelp").innerHTML = GROUPS.map(([g, ks]) => `<b style="color:var(--accent-text)">${g}</b><br>` + ks.map(k => `<b>${optLabel(k)}</b> — ${STRATS[k][1]}`).join("<br>")).join("<br><br>") + "<br>"
   + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.<br><b>추가 제외 규칙</b> — 합성수 5개 이상 · 공 색상 5가지가 모두 들어간 조합 · 소수 0개 또는 5개 이상 · 용지 가로줄(1~7, 8~14 …) 한 줄에 4개 이상이거나 6개가 모두 다른 줄인 조합 · 용지 세로줄(1·8·15 …) 한 줄에 4개 이상 · 3의 배수 5개 이상 · 5의 배수 4개 이상 · 직전 회차 번호(이월수) 3개 이상. 이 규칙들은 취향에 따른 필터이며 1등 확률을 바꾸지 않습니다.";
 $("gameCount").innerHTML = Array.from({ length: 10 }, (_, i) => `<option${i === 4 ? " selected" : ""}>${i + 1}</option>`).join("");
 $("allStrat").innerHTML = `<option value="">게임별로 고르기</option><option value="__saju">🔮 내 사주 맞춤 배분</option>` + optHtml("");

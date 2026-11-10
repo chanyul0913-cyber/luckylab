@@ -1173,6 +1173,48 @@ function backtestProfile() { // 내 정보가 바뀌면 사주·별자리·점�
   runBacktest(PROFILE, res => { btBusy = false; btProfileKey = key; if (saju && saju.key === key) Object.assign(BT, res); computeMeta(); renderBT(); backtestProfile(); });
 }
 const baseKeys = SKEYS.filter(k => !PROFILE.includes(k) && k !== "deep" && k !== "btop" && ((k !== "manse" && k !== "celeb") || window.Solar));
+// ---------- 자가 점검 (어떤 AI 도구로 고쳤든 수정 후 브라우저 콘솔에서 await selfTest() 실행) ----------
+// problems가 비어 있어야 정상. 화면 상태(게임 선택 등)는 건드리지 않음
+window.selfTest = async function selfTest() {
+  const problems = [], warnings = [], ok6 = s => Array.isArray(s) && s.length === 6 && new Set(s).size === 6
+    && s.every((x, i) => Number.isInteger(x) && x >= 1 && x <= 45 && (!i || s[i - 1] < x));
+  // 1) 데이터: 회차 연속, 번호 형식, 7일 간격
+  D.forEach((d, i) => {
+    if (d.no !== i + 1) problems.push(`데이터: ${i + 1}번째 회차 번호가 ${d.no}`);
+    if (!ok6(d.n) || d.n.includes(d.b)) problems.push(`데이터: ${d.no}회 번호 이상`);
+    if (i && (drawDay(d) - drawDay(D[i - 1])) / 864e5 !== 7) warnings.push(`데이터: ${d.no}회가 직전 회차와 7일 간격이 아님`);
+  });
+  if (!LAST.sales && !LAST.w1) warnings.push(`데이터: ${LAST.no}회 당첨금 집계 전 (다음 자동 갱신 때 채워짐)`);
+  // 2) 전략 목록: 묶음에 빠짐·중복 없음, 설명 있음
+  const g = GROUPS.flatMap(x => x[1]);
+  if (g.length !== new Set(g).size || g.slice().sort().join() !== SKEYS.slice().sort().join()) problems.push("전략: GROUPS와 STRATS가 맞지 않음");
+  SKEYS.forEach(k => { if (!STRATS[k][0] || !STRATS[k][1]) problems.push(`전략: ${k} 이름/설명 없음`); });
+  // 3) 전략마다 30번씩 뽑아 6개 형식 + 제외 규칙(okShape) 통과 확인
+  for (const k of SKEYS) {
+    if (k === "btop") continue; // 다른 전략으로 연결될 뿐 자체 함수 없음
+    if (PROFILE.includes(k) && !saju) { warnings.push(`전략: ${k}는 내 정보가 없어 건너뜀`); continue; }
+    if (k === "deep" && !dl) { warnings.push("전략: deep은 dl.js가 최신 회차가 아니라 건너뜀"); continue; }
+    if ((k === "manse" || k === "celeb") && !window.Solar) { warnings.push(`전략: ${k}는 만세력 라이브러리가 없어 건너뜀`); continue; }
+    const R = rng(hashStr(k) + 1);
+    for (let t = 0; t < 30; t++) {
+      let s, tries = 0;
+      try { do s = STRATS[k][2](R, LIVE, t % 10); while (++tries < 5000 && !okShape(s)); }
+      catch (e) { problems.push(`전략: ${k} 실행 오류 ${e.message}`); break; }
+      if (!ok6(s)) { problems.push(`전략: ${k}가 잘못된 번호 ${s}`); break; }
+      if (!okShape(s)) { problems.push(`전략: ${k}가 제외 규칙을 못 통과 ${s}`); break; }
+    }
+  }
+  // 4) 부가 데이터
+  if (window.LOTTO_DL && LOTTO_DL.last !== N) warnings.push(`딥러닝: dl.js가 ${LOTTO_DL.last}회 기준 (최신 ${N}회, 다음 학습 때 갱신)`);
+  if (!RICH) warnings.push("세계 부자: rich.js가 없어 2026 연간 순위로 표시 중");
+  // 5) 백테스트 계산 완료와 숫자 이상 여부
+  for (let w = 0; btBusy && w < 100; w++) await new Promise(r => setTimeout(r, 300));
+  if (btBusy) problems.push("백테스트: 30초 안에 끝나지 않음");
+  Object.entries(BT).forEach(([k, r]) => { if (!r.n || !isFinite(r.hit / r.n)) problems.push(`백테스트: ${k} 결과 이상`); });
+  const res = { ok: !problems.length, problems, warnings };
+  console.log(res.ok ? "✅ selfTest 통과" : "❌ selfTest 문제 발견", res);
+  return res;
+};
 window.btReady = true;
 renderBT();
 btBusy = true;

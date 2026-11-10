@@ -604,9 +604,9 @@ function celebList() { // CELEBS(유명인·세계 부자 TOP10) 사주의 일�
     const seen = new Set();
     celebData = CELEBS.map(c => { try {
       const s = calcSaju(toP(c));
-      return { name: c[1], cnt: s.cnt, dmGan: s.pillars[2].gan, dmJi: s.pillars[2].ji };
+      return { name: c[1].replace(/^\d+\.\s*/, ""), cnt: s.cnt, dmGan: s.pillars[2].gan, dmJi: s.pillars[2].ji };
     } catch { return null; } }).filter(Boolean)
-      .filter(c => { const k = c.name.replace(/^\d+\.\s*/, ""); if (seen.has(k)) return false; seen.add(k); return true; });
+      .filter(c => { if (seen.has(c.name)) return false; seen.add(c.name); return true; }); // 글로벌과 세계 부자에 겹친 사람(머스크 등) 한 번만
   }
   return celebData;
 }
@@ -619,7 +619,7 @@ function celebBlendAt(date) { // 유명인 전원을 그 날짜 운세 점수로
     .slice(0, 10);
   return { top, draw };
 }
-function celebPlan() { // 이번 추첨일(토요일) 기준 — 같은 주면 항상 같은 결과
+function celebPlan() { // 이번 추첨일(토요일) 기준 운세 순위 — 같은 주면 순위는 같고, 번호는 누를 때마다 새로 뽑음
   if (celebCache !== undefined) return celebCache;
   return celebCache = window.Solar ? celebBlendAt(drawDate) : null;
 }
@@ -791,7 +791,7 @@ const STRATS = {
   zodiac: ["별자리형", "내 태양 별자리 번호(양자리 1 … 물고기자리 12)와 12씩 더한 수, 같은 원소 별자리 번호, 추첨일 별자리 번호에 가중치", (R, c = LIVE) => pick6(R, c.zw)],
   astro: ["점성술형", "번호를 한 자리로 줄인 수(수비학)가 내 별자리 지배행성·태어난 요일 행성·생명수·추첨일 행성의 수와 같으면 가중치", (R, c = LIVE) => pick6(R, c.aw)],
 };
-// 만세력형: 내 정보 없이, 이번 추첨 시각(토 20:35)의 사주 8글자로 번호를 정함 → 그 주에는 누구에게나 같은 번호
+// 만세력형: 내 정보 없이, 이번 추첨 시각(토 20:35)의 사주 8글자로 번호 가중치를 정함 (그 주 기운은 같고, 번호는 누를 때마다 새로 뽑음)
 let manseCache;
 function manse() {
   if (manseCache !== undefined) return manseCache;
@@ -912,7 +912,6 @@ function generate() {
     const prof = PROFILE.includes(k);
     if (prof && !saju) {
       $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 아래 '내 정보 입력'을 먼저 저장하세요.`; return; }
-    // 사주·별자리·점성술형은 사람·회차·전략·순번으로 시드를 고정하고 겹침 검사도 하지 않음 (항상 같은 결과)
     if (k === "manse" && !manse()) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 만세력 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.`; return; }
     if (k === "celeb" && !celebPlan()) { $("res" + i).innerHTML = ""; $("why" + i).innerHTML = `<b>${name}</b> · 유명인 사주를 계산하지 못했습니다. 인터넷 연결을 확인하세요.`; return; }
     const R = k === "quantum" ? cryptoR : rng(seed + i * 7919);

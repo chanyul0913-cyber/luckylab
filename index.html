@@ -1130,6 +1130,24 @@ if (dl) renderDL();
 // ---------- 백테스트 (각 회차는 직전 회차까지만 사용) ----------
 // 실제 추천과 같은 전략 함수·같은 형태 필터를, 회차마다 그 이전 데이터로 만든 기준값으로 돌림 (미래 데이터 차단)
 const BT_START = 101, BT = {};
+const BT_CACHE_VER = 1;   // 전략·제외 규칙·점수 계산을 바꿀 때 1씩 올린다 (지난 백테스트 캐시 무효화)
+let btFromCache = false;
+function loadBTCache() { // 새 회차·같은 코드면 지난 백테스트 결과를 그대로 씀 (재방문 시 수십 초 절약)
+  try {
+    const c = JSON.parse(localStorage.getItem("lottoBT") || "null");
+    if (!c || c.ver !== BT_CACHE_VER || c.last !== N || !c.stats) return false;
+    for (const k of Object.keys(c.stats)) BT[k] = c.stats[k];
+    btFromCache = true;
+    return true;
+  } catch { return false; }
+}
+function saveBTCache() { // 기본 전략(+백테스트형)만 저장 — 사주 계열은 사람별이라 매번 계산
+  try {
+    const stats = {};
+    for (const k of Object.keys(BT)) if (!PROFILE.includes(k) && BT[k] && BT[k].n) stats[k] = { hit: BT[k].hit, h3: BT[k].h3, h4: BT[k].h4, n: BT[k].n };
+    localStorage.setItem("lottoBT", JSON.stringify({ ver: BT_CACHE_VER, last: N, stats }));
+  } catch {}
+}
 const drawDay = d => new Date(+d.ymd.slice(0, 4), +d.ymd.slice(4, 6) - 1, +d.ymd.slice(6), 12);
 function runBacktest(keys, done) {
   const res = Object.fromEntries(keys.map(k => [k, { hit: 0, h3: 0, h4: 0, n: 0, g: new Int8Array(N * 5).fill(-1) }]));
@@ -1180,8 +1198,8 @@ function runBacktest(keys, done) {
 // 백테스트형 검증: 회차마다 '그 이전까지의' 3+ 순위 상위 5개 전략을 골라 그 회차 결과를 씀 (미래 순위 사용 안 함)
 function computeMeta() {
   const keys = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].g);
+  if (keys.length < 5) return;   // 캐시로 불러온 백테스트형 성적을 지우지 않게 먼저 확인
   delete BT.btop;
-  if (keys.length < 5) return;
   const cum = Object.fromEntries(keys.map(k => [k, { h3: 0, hit: 0, n: 0 }])), res = { hit: 0, h3: 0, h4: 0, n: 0 };
   const rate = k => cum[k].h3 / cum[k].n, mean = k => cum[k].hit / cum[k].n;
   for (let i = 0; i < N; i++) {
@@ -1206,7 +1224,9 @@ function renderBT() {
   const zs = z => (z >= 0 ? "+" : "") + z.toFixed(2);
   $("btTxt").innerHTML = `제${BT_START}회~제${LAST.no}회 ${N - BT_START + 1}회를, 매 회차 <b>그 이전 데이터만</b> 보고 각 전략으로 5게임씩 뽑아 실제 결과와 맞춰 봤습니다.
     추천과 똑같은 전략·제외 규칙을 씁니다. 무작위 기준: 게임당 평균 0.800개 일치, 3개 이상 ${(P3 * 100).toFixed(2)}%.
-    전략을 ${m}개 비교하므로 |z| &gt; ${zc.toFixed(2)}여야 유의합니다.`;
+    전략을 ${m}개 비교하므로 |z| &gt; ${zc.toFixed(2)}여야 유의합니다.`
+    + (btFromCache ? ` <b>이전에 계산한 결과를 불러왔습니다</b>(새 회차가 나오면 자동 다시 계산)` : "")
+    + ` <span id="btRecalc" role="button" style="text-decoration:underline;cursor:pointer;color:var(--ink2)">🔄 다시 계산</span>`;
   $("bt").innerHTML = "<tr><th>전략</th><th>평균 일치</th><th>3개+</th><th>4개+</th><th>z</th><th>판정</th></tr>" + rows.map(k => {
     const name = STRATS[k][0];
     if (k === "deep") { const mean = dl.hit / dl.n, z = (mean - MU) / Math.sqrt(VAR / dl.n), has3 = dl.h3 != null;
@@ -1218,6 +1238,7 @@ function renderBT() {
       : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 10개로 1게임씩${BT.saju ? ", 사주 계열 포함" : ""}</small>` : "";
     return `<tr><td>${name}${who}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`;
   }).join("");
+  const recalc = $("btRecalc"); if (recalc) recalc.onclick = () => { try { localStorage.removeItem("lottoBT"); } catch {} runBaseBT(); };
   updateFoldSum();
 }
 // 접힌 '검정 · 백테스트' 카드에 결론 한 줄 (펼치지 않아도 결과를 알 수 있게)
@@ -1277,9 +1298,14 @@ window.selfTest = async function selfTest() {
   return res;
 };
 window.btReady = true;
-renderBT();
-btBusy = true;
-runBacktest(baseKeys, res => { Object.assign(BT, res); btBusy = false; computeMeta(); renderBT(); backtestProfile(); });
+function runBaseBT() { // 기본 전략 백테스트 전체 다시 계산 (캐시 무시)
+  Object.keys(BT).forEach(k => delete BT[k]);
+  btProfileKey = null;
+  btFromCache = false; btBusy = true; renderBT();
+  runBacktest(baseKeys, res => { Object.assign(BT, res); btBusy = false; computeMeta(); saveBTCache(); renderBT(); backtestProfile(); });
+}
+if (loadBTCache()) { renderBT(); backtestProfile(); } // 같은 코드·같은 회차면 지난 결과를 그대로 표시
+else runBaseBT();
 
 // ---------- 새 버전 확인 ----------
 // 배포할 때 GitHub Actions가 APP_VER와 version.json에 같은 번호를 넣음. 열어 둔 화면이 예전 버전이면 띠를 띄움

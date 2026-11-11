@@ -1159,16 +1159,18 @@ $("restoreMine").onchange = e => {
       const d = JSON.parse(r.result), items = Array.isArray(d) ? d : d.list;
       if (!Array.isArray(items)) throw new Error("로분소 목록 파일이 아닙니다");
       const key = q => (q.name || "") + "|" + q.y + "|" + q.m + "|" + q.d;
-      let added = 0;
+      let added = 0, skipped = 0;
       for (const p of items) {
-        if (!p || !p.y || !p.m || !p.d) continue;
+        if (!p || !p.y || !p.m || !p.d) { skipped++; continue; }
         const q = { name: String(p.name || "").slice(0, 20), cal: p.cal === "lunar" ? "lunar" : "solar", leap: !!p.leap, y: +p.y, m: +p.m, d: +p.d, h: p.h ?? "", mi: p.mi ?? "0" };
-        calcSaju(q); // 존재하지 않는 날짜는 여기서 걸러짐
-        if (myList.some(x => key(x) === key(q))) continue;
+        try { calcSaju(q); } catch { skipped++; continue; } // 존재하지 않는 날짜 등은 그 항목만 건너뜀
+        if (!(q.y >= 1900 && q.y <= 2100)) { skipped++; continue; }
+        if (myList.some(x => key(x) === key(q))) { skipped++; continue; }
         myList.push(q); added++;
       }
       saveList(); renderPresets();
-      $("sjMsg").textContent = added ? `${added}명을 목록에 불러왔어요` : "이미 목록에 있는 사람들이라 새로 추가된 게 없어요";
+      $("sjMsg").textContent = added ? `${added}명을 목록에 불러왔어요${skipped ? ` (건너뜀 ${skipped}명 — 날짜 오류·중복)` : ""}`
+        : skipped ? `새로 추가된 사람이 없어요 (날짜 오류·중복 ${skipped}명)` : "새로 추가된 사람이 없어요";
     } catch (err) { $("sjMsg").textContent = "불러오기 실패 — " + err.message; }
     e.target.value = "";
   };

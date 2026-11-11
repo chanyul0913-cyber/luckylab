@@ -1174,7 +1174,7 @@ $("backupMine").onclick = () => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
   a.download = `로분소-사주목록-${data.saved}.json`;
-  a.click(); URL.revokeObjectURL(a.href);
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); // 바로 지우면 일부 브라우저(아이폰 사파리 등)에서 내려받기가 안 됨
   $("sjMsg").textContent = "목록 파일을 내려받았어요 — 잘 보관해 두세요";
 };
 $("importMine").onclick = () => $("restoreMine").click();
@@ -1276,7 +1276,7 @@ function runBacktest(keys, done) {
   }
   step();
 }
-// 백테스트형 검증: 회차마다 '그 이전까지의' 3+ 순위 상위 5개 전략을 골라 그 회차 결과를 씀 (미래 순위 사용 안 함)
+// 백테스트형 검증: 회차마다 '그 이전까지의' 3+ 순위 상위 10개 전략을 골라 그 회차 결과를 씀 (미래 순위 사용 안 함)
 function computeMeta() {
   const keys = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].g);
   if (keys.length < 5) return;   // 캐시로 불러온 백테스트형 성적을 지우지 않게 먼저 확인
@@ -1291,6 +1291,7 @@ function computeMeta() {
     }
     for (const k of keys) for (let g = 0; g < 5; g++) { const h = BT[k].g[i * 5 + g]; if (h < 0) continue; const c = cum[k]; c.n++; c.hit += h; c.h3 += h >= 3; }
   }
+  res.saju = keys.some(k => PROFILE.includes(k)); // 설명 문구용: 이번 계산에 사주 계열이 실제로 들어갔는지 (캐시에서 불러온 성적은 사주 미포함)
   BT.btop = res;
 }
 // 양측 유의수준 0.05를 비교 전략 수로 나눈 기준 z (본페로니)
@@ -1316,7 +1317,7 @@ function renderBT() {
     if (!r) return `<tr><td>${name}</td><td colspan="5" class="note" style="text-align:left">${saju ? "계산 중…" : "내 정보 입력 후 계산됩니다"}</td></tr>`;
     const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n);
     const who = PROFILE.includes(k) && saju ? ` <small class="note">${saju.name ? esc(saju.name) + " 기준" : "내 사주 기준"}</small>`
-      : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 10개로 1게임씩${BT.saju ? ", 사주 계열 포함" : ""}</small>` : "";
+      : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 10개로 1게임씩${r.saju ? ", 사주 계열 포함" : ""}</small>` : "";
     return `<tr><td>${name}${who}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`;
   }).join("");
   const recalc = $("btRecalc"); if (recalc) recalc.onclick = () => { try { localStorage.removeItem("lottoBT"); } catch {} runBaseBT(); };

@@ -244,6 +244,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
       <li>게임마다 <b>전략</b>을 고릅니다. 모든 게임을 같은 전략으로 하려면 <b>'전체 전략'</b>에서 고르세요.</li>
       <li><b>[번호 뽑기]</b>를 누릅니다. 다시 누르면 새 번호가 나옵니다.</li>
       <li><b>[번호 복사]</b>로 번호를 복사해 메모나 카톡에 붙여 넣을 수 있습니다.</li>
+      <li><b>[카톡 공유]</b>를 누르면 공유창이 열려 번호와 사이트 주소를 카톡으로 바로 보낼 수 있습니다. 공유창이 없는 컴퓨터에서는 번호+주소가 복사됩니다.</li>
     </ol>
 
     <h3>전략 종류</h3>
@@ -317,6 +318,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
     <div class="row" style="margin-top:8px">
       <button class="primary" id="again">번호 뽑기</button>
       <button id="copy" disabled>번호 복사</button>
+      <button id="share" disabled title="기기 공유창을 열어요 — 카톡을 골라 보내면 번호와 사이트 주소가 함께 갑니다">카톡 공유</button>
       <span class="toast" id="toast" role="status"></span>
     </div>
     <details id="celebRank" style="margin-top:10px" hidden><summary>🏆 이번 주 유명인 운세 순위 (1~10위)</summary><div class="note" id="celebRankBody"></div></details>
@@ -466,7 +468,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
         <div class="balls sm"><span class="ball b1">6</span><span class="ball b2">13</span><span class="ball b3">22</span><span class="ball b4">31</span><span class="ball b4">37</span><span class="ball b5">43</span></div>
         <div class="fakebtn hl small">번호 복사 <span class="no">5</span></div>
       </div>
-      <p class="cap"><b>[번호 복사]</b>를 누르고<br>카톡이나 메모에 붙여 넣으세요.</p>
+      <p class="cap"><b>[카톡 공유]</b>를 눌러 카톡으로 바로 보내거나,<br><b>[번호 복사]</b>로 붙여 넣으세요.</p>
     </div>
   </div>
   <div class="picsNav"><button id="picsPrev">◀ 이전</button><span id="picsDots"></span><button id="picsNext" class="primary">다음 ▶</button></div>
@@ -996,6 +998,7 @@ function generate() {
           return ` · ${drawDate.getMonth() + 1}/${drawDate.getDate()} 토요일 운세 ${Math.min(i, p.top.length - 1) + 1}위 ${t.name}(${t.r.grade}, 재물+${t.r.wealth}) 사주로 뽑음`; })() : "");
   });
   $("copy").disabled = !current.length;
+  $("share").disabled = !current.length;
   if (choice.some(k => PROFILE.includes(k)) && !saju) $("sjY").focus();
   renderCelebRank();
 }
@@ -1009,13 +1012,36 @@ function renderCelebRank() {
     + `<br>점수는 SAJOO식 오늘의 운세 계산(총점+재물운)이며, 번호 추천 시 누르는 순간마다 이 순위대로 게임에 배정됩니다.`;
 }
 $("again").onclick = generate;
+const shareText = () => `로또 6/45 제${LAST.no + 1}회 분석 조합\n` + current.map((c, i) => `${i + 1}. ${c.s.join(" ")} (${c.name})`).join("\n");
+function copyText(t) { // 클립보드 API가 막힌 환경을 위한 옛 방식 복사
+  const ta = document.createElement("textarea");
+  ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  let ok = false; try { ok = document.execCommand("copy"); } catch {}
+  ta.remove(); return ok;
+}
 async function copyNumbers(toast) {
-  const txt = `로또 6/45 제${LAST.no + 1}회 분석 조합\n` + current.map((c, i) => `${i + 1}. ${c.s.join(" ")} (${c.name})`).join("\n");
-  try { await navigator.clipboard.writeText(txt); toast.textContent = "복사했어요"; }
-  catch { toast.textContent = "복사 실패 — 직접 선택해 복사하세요"; }
+  let ok = false;
+  try { await navigator.clipboard.writeText(shareText()); ok = true; } catch {}
+  if (!ok) ok = copyText(shareText());
+  toast.textContent = ok ? "복사했어요" : "복사 실패 — 직접 선택해 복사하세요";
   setTimeout(() => toast.textContent = "", 2000);
 }
 $("copy").onclick = () => copyNumbers($("toast"));
+// 카톡 공유: 기기 공유창(모바일에서 카톡 선택 가능)을 열고, 공유창이 없는 환경은 번호+주소를 복사로 대체
+async function shareNumbers(toast) {
+  const url = location.origin + location.pathname;
+  if (navigator.share) {
+    try { await navigator.share({ title: "로분소 로또 분석", text: shareText() + "\n(재미용 분석 조합 — 당첨 확률은 어떤 번호든 똑같아요)", url }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; } // 사용자가 공유창을 닫은 것
+  }
+  let ok = false;
+  try { await navigator.clipboard.writeText(shareText() + "\n" + url); ok = true; } catch {}
+  if (!ok) ok = copyText(shareText() + "\n" + url);
+  toast.textContent = ok ? "이 기기엔 공유창이 없어 번호+주소를 복사했어요" : "복사 실패 — 직접 선택해 복사하세요";
+  setTimeout(() => toast.textContent = "", 2500);
+}
+$("share").onclick = () => shareNumbers($("toast"));
 
 // 사주 입력 폼
 $("sjH").innerHTML += Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, "0")}시</option>`).join("");
@@ -1087,8 +1113,9 @@ function showQuick(p) {
     if (!applySajuPlan()) return;
     generate();
     $("cqOut").innerHTML = current.map((c, i) => `<div class="balls">${c.s.map(ball).join("")}</div><div class="note" style="margin:0 0 4px">${i + 1}게임 · ${c.name}</div>`).join("")
-      + `<button id="cqCopy">번호 복사</button> <span class="toast" id="cqToast"></span>`;
+      + `<button id="cqCopy">번호 복사</button> <button id="cqShare">카톡 공유</button> <span class="toast" id="cqToast"></span>`;
     $("cqCopy").onclick = () => copyNumbers($("cqToast"));
+    $("cqShare").onclick = () => shareNumbers($("cqToast"));
   };
   q.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }

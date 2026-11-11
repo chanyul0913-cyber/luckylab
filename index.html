@@ -1279,6 +1279,89 @@ function runBacktest(keys, done) {
   }
   step();
 }
+// ---------- 백테스트 워커: 계산을 별도 스레드로 보내 화면이 안 멈추게 한다 ----------
+// 전략 엔진 함수들을 문자열로 모아 Blob 워커를 만든다(단일 출처 유지). 실패하면 위의 메인 스레드 방식으로 되돌아감.
+let btW = null;
+function buildWorkerSource() {
+  const consts = { NUMS, GAN, JI, JI_K, GAN_OH, JI_OH, OHS, DIGIT_OH, TEN_SCORE, REL_SCORE, REL_TABLE, OH_GEN, OH_KEUK, CELEB_HAP, SIGNS, DAY_PLANET, BT_START };
+  const fns = [rng, hashStr, pick6, shuffle, okShape, overdueOf, markovWeights, quantumWeights, numOh, dayGZ, drawDay, ohWeights,
+    sajuWeightsAt, manseAt, signOf, dr, westWeightsAt, shiShen, zaRel, celebScore, celebBlendAt];
+  return `
+try { importScripts("https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js"); } catch (e) {}
+const ${Object.entries(consts).map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join(", ")};
+const PRIMES = new Set(${JSON.stringify([...PRIMES])});
+${fns.map(f => `const ${f.name} = ${f};`).join("\n")}
+let N = 0, saju = null, celebData = [], KEYS = [], STRATS = {}, res = null, DONE = null;
+function celebList() { return celebData; }
+let fr, ls, tr, oc, sumsH, past, i;
+function run(keys, done) {
+  KEYS = keys; DONE = done;
+  res = Object.fromEntries(keys.map(k => [k, { hit: 0, h3: 0, h4: 0, n: 0, g: new Int8Array(N * 5).fill(-1) }]));
+  fr = Array(46).fill(0); ls = Array(46).fill(0); tr = Array.from({ length: 46 }, () => Array(46).fill(0)); oc = Array(46).fill(0);
+  sumsH = []; past = new Set(); i = 0;
+  step();
+}
+function step() {
+  const until = Math.min(N, i + 250), t0 = Date.now();
+  for (; i < until; i++) {
+    const d = DATA[i];
+    if (d.no >= BT_START) {
+      const no = d.no, gp = k => (no - 1) - ls[k], c50h = Array(46).fill(0);
+      DATA.slice(Math.max(0, i - 50), i).forEach(x => x.n.forEach(v => c50h[v]++));
+      const ctx = { qlo: sumsH[Math.floor(0.1 * (sumsH.length - 1))], qhi: sumsH[Math.floor(0.9 * (sumsH.length - 1))],
+        prev: DATA[i - 1].n, pastSet: past, freq: fr, c50: c50h, overdue: overdueOf(gp),
+        get markovW() { return markovWeights(tr, oc, DATA[i - 1].n); }, get qW() { return quantumWeights(fr, c50h, gp, i); },
+        get manseW() { return manseAt(drawDay(d)).w; },
+        get sajuW() { return sajuWeightsAt(saju.cnt, drawDay(d)).w; },
+        get zw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).zw; },
+        get aw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).aw; },
+        get celebPlan() { return celebBlendAt(drawDay(d)); } };
+      const win = new Set(d.n);
+      for (const key of ["markovW", "qW", "manseW", "sajuW", "zw", "aw", "celebPlan"]) {
+        const raw = Object.getOwnPropertyDescriptor(ctx, key).get; let v;
+        Object.defineProperty(ctx, key, { get: () => v ??= raw.call(ctx) });
+      }
+      for (const k of KEYS) {
+        const fn = STRATS[k][2], R = rng(no * 7919 + hashStr(k)), cx = Object.create(ctx);
+        for (let g = 0; g < 5; g++) {
+          let s, tries = 0;
+          do s = fn(R, cx, g); while (++tries < 500 && !okShape(s, cx));
+          const h = s.filter(x => win.has(x)).length, r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4; r.g[i * 5 + g] = h;
+        }
+      }
+    }
+    d.n.forEach(x => { fr[x]++; ls[x] = d.no; });
+    if (i) for (const a of DATA[i - 1].n) { oc[a]++; for (const b of d.n) tr[a][b]++; }
+    const sm = d.n.reduce((a, b) => a + b, 0); sumsH.splice(sumsH.findIndex(v => v > sm) >>> 0, 0, sm); past.add(d.n.join(","));
+  }
+  postMessage({ p: Math.round(i / N * 100) });
+  if (i < N) setTimeout(step, 0); else DONE(res);
+}
+onmessage = e => {
+  const m = e.data;
+  if (m.cmd !== "run") return;
+  N = m.N; saju = m.saju; celebData = m.celeb; DATA = m.D;
+  STRATS = {};
+  for (const [k, s] of m.strats) STRATS[k] = [k, "", eval("(" + s + ")")];
+  run(m.keys, r => postMessage({ done: r }));
+};`;
+}
+function startBT(keys, done) { // 워커로 백테스트(별도 스레드, 화면 안 멈춤) — 만들 수 없거나 실패하면 기존 방식으로
+  const fail = () => { try { if (btW) { btW.terminate(); btW = null; } } catch {} runBacktest(keys, done); };
+  try {
+    if (btW === null) btW = new Worker(URL.createObjectURL(new Blob([buildWorkerSource()], { type: "text/javascript" })));
+    btW.onmessage = e => {
+      const m = e.data;
+      if (m.p !== undefined) $("btProg").textContent = `계산 중… ${m.p}%`;
+      if (m.done) { $("btProg").textContent = ""; btW.onerror = null; window.__btViaWorker = true; done(m.done); }
+    };
+    btW.onerror = e => { window.__btWerr = e.message || "오류"; console.warn("백테스트 워커 실패 — 기존 방식으로 계산:", e.message || e); btW = null; fail(); };
+    btW.postMessage({ cmd: "run", N, keys,
+      D: D.map(d => ({ no: d.no, ymd: d.ymd, n: d.n })),
+      celeb: celebList(), saju: saju ? { cnt: saju.cnt, west: { sign: saju.west.sign, life: saju.west.life, wday: saju.west.wday } } : null,
+      strats: keys.map(k => [k, STRATS[k][2].toString()]) });
+  } catch { fail(); }
+}
 // 백테스트형 검증: 회차마다 '그 이전까지의' 3+ 순위 상위 10개 전략을 골라 그 회차 결과를 씀 (미래 순위 사용 안 함)
 function computeMeta() {
   const keys = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].g);
@@ -1337,7 +1420,7 @@ let btBusy = false, btProfileKey = null;
 function backtestProfile() { // 내 정보가 바뀌면 사주·별자리·점성술형만 다시 계산
   if (!saju || btBusy || btProfileKey === saju.key) return;
   const key = saju.key; btBusy = true; PROFILE.forEach(k => delete BT[k]); renderBT();
-  runBacktest(PROFILE, res => { btBusy = false; btProfileKey = key; if (saju && saju.key === key) Object.assign(BT, res); computeMeta(); renderBT(); backtestProfile(); });
+  startBT(PROFILE, res => { btBusy = false; btProfileKey = key; if (saju && saju.key === key) Object.assign(BT, res); computeMeta(); renderBT(); backtestProfile(); });
 }
 const baseKeys = SKEYS.filter(k => !PROFILE.includes(k) && k !== "deep" && k !== "btop" && ((k !== "manse" && k !== "celeb") || window.Solar));
 // ---------- 자가 점검 (어떤 AI 도구로 고쳤든 수정 후 브라우저 콘솔에서 await selfTest() 실행) ----------
@@ -1387,7 +1470,7 @@ function runBaseBT() { // 기본 전략 백테스트 전체 다시 계산 (캐�
   Object.keys(BT).forEach(k => delete BT[k]);
   btProfileKey = null;
   btFromCache = false; btBusy = true; renderBT();
-  runBacktest(baseKeys, res => { Object.assign(BT, res); btBusy = false; computeMeta(); saveBTCache(); renderBT(); backtestProfile(); });
+  startBT(baseKeys, res => { Object.assign(BT, res); btBusy = false; computeMeta(); saveBTCache(); renderBT(); backtestProfile(); });
 }
 if (loadBTCache()) { renderBT(); backtestProfile(); } // 같은 코드·같은 회차면 지난 결과를 그대로 표시
 else runBaseBT();

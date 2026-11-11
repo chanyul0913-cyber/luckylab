@@ -28,7 +28,7 @@
 | `index.html` | 사이트 전체 (화면·전략·백테스트·사주 계산 모두 이 한 파일) | 예 |
 | `fetch_lotto.py` | 동행복권에서 당첨번호 수집 → `lotto645.csv`, `data.js` 생성. 당첨금 발표 전에 받은 회차(판매액 0)는 다음 실행 때 다시 받아 채움 | 예 |
 | `dl_train.py` | 딥러닝(LSTM, PyTorch) 학습 → `dl.js`. 새 회차가 있을 때만 학습, 직전 예측을 `prev`로 보관 | 예 |
-| `fetch_rich.py` | 포브스 실시간 부자 순위(비공식 내부 주소) → `rich.js`. 실패하면 기존 파일 유지 | 예 |
+| `fetch_rich.py` | 포브스 실시간 부자 순위(비공식 내부 주소) → `rich.js`. 실패하면 기존 파일 유지. 출력에 `ver` 필드 — 형식을 바꿀 때 1씩 올리고 화면(index.html)도 같이 고침 | 예 |
 | `analyze.py` → `analysis_result.txt` | 초기 Python 독립 분석 보고서 (사이트와 별개) | 필요할 때만 |
 | `lotto645.csv`, `data.js`, `dl.js`, `rich.js` | **자동 생성 데이터.** 위 스크립트로만 만든다 | **아니오** |
 | `.github/workflows/update.yml` | 자동 갱신·배포 파이프라인 | 예 (신중히) |

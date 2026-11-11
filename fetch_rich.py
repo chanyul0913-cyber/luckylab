@@ -53,7 +53,7 @@ except Exception as e:  # 실패해도 사이트는 기존 rich.js로 계속 동
     print(f"경고: 포브스 순위를 받지 못해 기존 rich.js 유지 ({e})")
     sys.exit(0)
 
-res = {"date": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d"), "list": out}
+res = {"ver": 1, "date": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d"), "list": out}  # ver: 화면이 읽는 형식 버전 — 형식을 바꿀 때 1씩 올림
 with open(OUT, "w", encoding="utf-8") as f:
     f.write("window.LOTTO_RICH=" + json.dumps(res, ensure_ascii=False, separators=(",", ":")) + ";\n")
 print("rich.js 갱신:", ", ".join(f"{x['rank']}.{x['name']}" for x in out))

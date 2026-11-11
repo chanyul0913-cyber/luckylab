@@ -1070,7 +1070,8 @@ function fillForm(p) {
 try { const p = JSON.parse(localStorage.getItem("lottoSaju") || "null"); if (p) { fillForm(p); applyProfile(p, false); } } catch {}
 
 // 유명인·내 목록: 누르면 폼에 채우고 바로 저장 (기존 입력 방식은 그대로)
-const RICH = window.LOTTO_RICH && window.LOTTO_RICH.list && window.LOTTO_RICH.list.length === 10
+const RICH = window.LOTTO_RICH && (window.LOTTO_RICH.ver === undefined || window.LOTTO_RICH.ver === 1)
+  && window.LOTTO_RICH.list && window.LOTTO_RICH.list.length === 10
   ? window.LOTTO_RICH.list.map(x => ["세계 부자 TOP10", `${x.rank}. ${x.name}`, x.y, x.m, x.d, `$${x.worth}B`]) : null;
 const CELEBS = [ // [분류, 이름, 양력 년, 월, 일, (재산)] — 공개된 생년월일
   ["정치", "이재명", 1963, 12, 8],
@@ -1462,10 +1463,28 @@ window.selfTest = async function selfTest() {
   // 4) 부가 데이터
   if (window.LOTTO_DL && LOTTO_DL.last !== N) warnings.push(`딥러닝: dl.js가 ${LOTTO_DL.last}회 기준 (최신 ${N}회, 다음 학습 때 갱신)`);
   if (!RICH) warnings.push("세계 부자: rich.js가 없어 2026 연간 순위로 표시 중");
+  if (window.LOTTO_RICH && window.LOTTO_RICH.ver !== undefined && window.LOTTO_RICH.ver !== 1)
+    problems.push(`세계 부자: rich.js 형식 버전(${window.LOTTO_RICH.ver})이 화면(1)과 다름 — 화면을 먼저 고쳐야 함`);
   // 5) 백테스트 계산 완료와 숫자 이상 여부
   for (let w = 0; btBusy && w < 100; w++) await new Promise(r => setTimeout(r, 300));
   if (btBusy) problems.push("백테스트: 30초 안에 끝나지 않음");
   Object.entries(BT).forEach(([k, r]) => { if (!r.n || !isFinite(r.hit / r.n)) problems.push(`백테스트: ${k} 결과 이상`); });
+  // 6) 유닛 검사: 계산 엔진의 기본 약속들 (2026-11-12 — selfTest를 유닛 테스트로 확장)
+  {
+    const r1 = rng(12345), r2 = rng(12345);
+    const a1 = [r1(), r1(), r1()], a2 = [r2(), r2(), r2()];
+    if (a1.join() !== a2.join() || !a1.every(v => v >= 0 && v < 1)) problems.push("유닛: rng 같은 시드 → 같은 수열(0 이상 1 미만)이 아님");
+    if (typeof hashStr("가") !== "number" || hashStr("가") !== hashStr("가")) problems.push("유닛: hashStr 같은 입력에 같은 숫자가 아님");
+    const bad = [[1, 2, 3, 4, 5, 6], [5, 10, 15, 20, 25, 30], [1, 4, 6, 8, 9, 10]];   // 3연속 · 등차 · 구간 몰림+합성수 5개
+    if (bad.some(b => okShape(b))) problems.push("유닛: okShape가 규칙 위반 조합을 통과시킴");
+    let good = null;
+    try { for (let t = 0; t < 500 && !good; t++) { const s = STRATS.balance[2](rng(t + 1), LIVE, t % 10); if (okShape(s)) good = s; } } catch {}
+    if (!good) warnings.push("유닛: balance로 okShape 통과 조합을 못 만들어 건너뜀"); else if (!okShape(good)) problems.push("유닛: okShape가 옳은 조합을 거름");
+    const qw = quantumWeights(freq, c50, gap, N);
+    if (!NUMS.every(k => Number.isFinite(qw[k]) && qw[k] >= 0)) problems.push("유닛: quantumWeights에 음수·비정상 값");
+    const wasFC = btFromCache; saveBTCache(); const okc = loadBTCache(); btFromCache = wasFC;   // 캐시 저장→읽기 왕복(화면 표시는 원래대로)
+    if (!okc) problems.push("유닛: 백테스트 캐시 저장→읽기 실패");
+  }
   const res = { ok: !problems.length, problems, warnings };
   console.log(res.ok ? "✅ selfTest 통과" : "❌ selfTest 문제 발견", res);
   return res;

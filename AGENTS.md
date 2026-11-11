@@ -32,6 +32,8 @@
 | `analyze.py` → `analysis_result.txt` | 초기 Python 독립 분석 보고서 (사이트와 별개) | 필요할 때만 |
 | `lotto645.csv`, `data.js`, `dl.js`, `rich.js` | **자동 생성 데이터.** 위 스크립트로만 만든다 | **아니오** |
 | `.github/workflows/update.yml` | 자동 갱신·배포 파이프라인 | 예 (신중히) |
+| `manifest.webmanifest`, `icon-192.png`, `icon-512.png` | PWA 홈 화면 추가용 아이콘·정보 | 거의 안 고침 |
+| `sw.js` | 서비스 워커: 홈 화면 추가·오프라인. 회차 데이터는 네트워크 우선이라 갱신 자동 반영, **화면 파일 구조를 바꿨으면 `VER`을 1 올려** 옛 캐시를 비운다 | 예 (신중히) |
 | `.claude/launch.json` | Claude 미리보기용 로컬 서버 설정 (git 제외) | — |
 
 ## 자동 갱신·배포 (GitHub Actions `update.yml`)
@@ -55,6 +57,7 @@
 - 백테스트 결과는 localStorage(`lottoBT`)에 캐시된다. **전략·제외 규칙·점수 계산을 바꿨으면 `BT_CACHE_VER`를 반드시 1 올려** 지난 캐시를 무효화한다(안 올리면 옛 성적이 그대로 보인다).
 - 사주 계산: 외부 라이브러리 `lunar-javascript@1.7.7`(jsdelivr). 시간 30분 보정(서울 경도). 인터넷이 없으면 사주·만세력·유명인사주형만 꺼지고 나머지는 동작해야 함.
 - 저장: 브라우저 localStorage만 사용(`lottoSaju`, `lottoSajuList`). 서버로 개인정보를 보내지 않는다.
+- 서비스 워커는 배포된 사이트(https)에서만 등록된다. localhost·file://에서는 꺼져 있으니 개발 시 캐시 걱정 불필요.
 
 ## 디자인 규칙 (2026-11-10 정리, taste-skill에서 필요한 부분만 차용)
 - 글꼴: Pretendard(jsdelivr). 색은 `:root` 변수만 쓴다: 남색 `--brand`(주 버튼), 금색 `--accent`(보조 버튼·채움), 작은 금색 글씨는 `--accent-text`(대비 확보). 밝은·어두운 모드 둘 다 값이 있어야 함.

@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>로분소</title>
 <meta name="description" content="동행복권 로또 6/45 실제 당첨번호 전 회차를 분석해 통계·AI·사주 전략으로 번호를 뽑아 주는 로분소">
+<meta name="theme-color" content="#1e3a8a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
 :root{
@@ -302,6 +305,8 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
       <dd>사이트가 고쳐졌거나 새 당첨번호가 들어왔다는 뜻입니다. 띠의 <b>[새로고침]</b>을 누르면 최신 화면으로 바뀝니다. 입력해 둔 사주와 내 목록은 그대로 남습니다. 지금 보던 번호를 먼저 복사하고 싶으면 ✕로 닫았다가 나중에 눌러도 됩니다.</dd>
       <dt>새 회차는 언제 반영되나요?</dt>
       <dd>토요일 추첨(20:35) 뒤 밤 사이에 자동으로 반영됩니다. 늦어도 일요일 오전에는 반영됩니다.</dd>
+      <dt>휴대폰 홈 화면에 앱처럼 추가할 수 있나요?</dt>
+      <dd>됩니다. 브라우저 메뉴에서 '홈 화면 추가' 또는 '앱 설치'를 고르면 로분소 로고로 바로 열 수 있고, 한 번 열었던 화면은 인터넷이 잠깐 끊겨도 열립니다.</dd>
       <dt>'📊 검정 · 백테스트'는 뭔가요?</dt>
       <dd>과거 당첨번호에 패턴이 있는지 검사한 결과와, 각 전략이 과거에 실제로 얼마나 맞혔는지(백테스트)·딥러닝의 지난 회차 예측 결과를 모아 둔 곳입니다. 평소엔 접혀 있고 결론 한 줄만 보이며, 누르면 그래프와 표가 펼쳐집니다. 지금까지 모든 검사에서 '무작위와 같음', 즉 특별한 패턴이 없다고 나왔습니다.</dd>
     </dl>
@@ -1478,6 +1483,10 @@ else runBaseBT();
 // ---------- 새 버전 확인 ----------
 // 배포할 때 GitHub Actions가 APP_VER와 version.json에 같은 번호를 넣음. 열어 둔 화면이 예전 버전이면 띠를 띄움
 const APP_VER = "__APP_VER__";
+// PWA: 홈 화면 추가·오프라인 열기 (배포된 사이트에서만 등록 — 내 PC/localhost에서는 캐시가 개발을 방해하니 끔)
+if (location.protocol === "https:" && !/localhost|127\.0\.0\.1/.test(location.hostname)) {
+  try { navigator.serviceWorker.register("sw.js").catch(() => {}); } catch {}
+}
 let updDismissed = null;
 async function checkVersion() {
   if (APP_VER.startsWith("__")) return; // 내 PC에서 직접 열 때는 확인 안 함

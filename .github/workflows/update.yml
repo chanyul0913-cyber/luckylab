@@ -54,7 +54,7 @@ jobs:
           git diff --cached --quiet || { git commit -m "data: 자동 갱신 (로또 회차·포브스 순위)"; git push; }
       - name: 사이트 파일 모으기
         run: |
-          mkdir _site && cp index.html data.js dl.js rich.js sw.js manifest.webmanifest icon-192.png icon-512.png _site/
+          mkdir _site && cp index.html data.js dl.js rich.js sw.js manifest.webmanifest icon-192.png icon-512.png sitemap.xml _site/
           # 브라우저가 예전 데이터 파일을 캐시해 새 페이지와 섞이지 않도록, 배포마다 주소에 버전을 붙임
           sed -i -E 's/src="(data|dl|rich)\.js"/src="\1.js?v=${{ github.run_id }}"/g' _site/index.html
           grep -o 'src="[a-z]*\.js?v=[0-9]*"' _site/index.html

@@ -304,7 +304,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
       <dt>화면 위에 '🔄 새 버전이 나왔어요' 띠가 떠요.</dt>
       <dd>사이트가 고쳐졌거나 새 당첨번호가 들어왔다는 뜻입니다. 띠의 <b>[새로고침]</b>을 누르면 최신 화면으로 바뀝니다. 입력해 둔 사주와 내 목록은 그대로 남습니다. 지금 보던 번호를 먼저 복사하고 싶으면 ✕로 닫았다가 나중에 눌러도 됩니다.</dd>
       <dt>새 회차는 언제 반영되나요?</dt>
-      <dd>토요일 추첨(20:35) 뒤 밤 사이에 자동으로 반영됩니다. 늦어도 일요일 오전에는 반영됩니다.</dd>
+      <dd>토요일 추첨(20:35) 뒤 밤 사이에 자동으로 반영됩니다. 늦어도 일요일 오전에는 반영됩니다. 토요일 저녁 8시 판매 마감부터 반영 전까지는 이번 회차를 살 수 없으므로, 번호 뽑기가 자동으로 <b>다음 회차</b> 기준으로 바뀌고 안내 문구가 뜹니다.</dd>
       <dt>휴대폰 홈 화면에 앱처럼 추가할 수 있나요?</dt>
       <dd>됩니다. 브라우저 메뉴에서 '홈 화면 추가' 또는 '앱 설치'를 고르면 로분소 로고로 바로 열 수 있고, 한 번 열었던 화면은 인터넷이 잠깐 끊겨도 열립니다.</dd>
       <dt>'📊 검정 · 백테스트'는 뭔가요?</dt>
@@ -316,6 +316,7 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 
   <section class="card" id="pick">
     <h2>번호 뽑기 <span class="tag" id="target"></span></h2>
+    <p class="warn" id="closedNote" hidden></p>
     <p class="note">게임 수와 게임별 전략을 고른 뒤 '번호 뽑기'를 누르세요. 어느 전략이든 1등 확률은 똑같이 1/8,145,060입니다.</p>
     <div class="row" style="margin:12px 0">
       <label class="inl">게임 수 <select id="gameCount"></select></label>
@@ -524,16 +525,20 @@ const q = p => sums[Math.floor(p * (N - 1))];
 const pastSet = new Set(D.map(d => d.n.join(",")));
 
 $("meta").textContent = `동행복권 제1회(${fmtDate(D[0].ymd)}) ~ 제${LAST.no}회(${fmtDate(LAST.ymd)}) 실제 당첨번호 ${N}회 분석`;
-$("target").textContent = `제${LAST.no + 1}회 대상`;
+// 토요일 20:00(한국 시각) 판매 마감 뒤 ~ 새 당첨번호 반영 전에는 그 회차를 더 살 수 없으므로 그다음 회차를 대상으로 삼는다
+const SALE_CLOSED = Date.now() >= Date.UTC(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + 7, 11, 0); // 11:00 UTC = 20:00 KST
+const NEXT = LAST.no + (SALE_CLOSED ? 2 : 1), NEXT_DAYS = SALE_CLOSED ? 14 : 7;
+$("target").textContent = `제${NEXT}회 대상`;
+if (SALE_CLOSED) { $("closedNote").hidden = false; $("closedNote").innerHTML = `⏰ 제${LAST.no + 1}회는 <b>판매가 마감</b>됐어요(토요일 저녁 8시). 지금 뽑는 번호는 <b>다음 회차(제${NEXT}회)</b> 기준입니다. 제${LAST.no + 1}회 당첨번호는 늦어도 일요일 오전에 자동 반영됩니다.`; }
 $("footData").textContent = `마지막 반영: 제${LAST.no}회 (${fmtDate(LAST.ymd)})`;
 // 메뉴에서 '검정·백테스트'를 누르면 접힌 카드를 펼쳐서 보여 줌
 document.querySelector('.top nav a[href="#statsFold"]').addEventListener("click", () => { $("statsFold").open = true; });
-const drawDateTxt = (() => { const d = new Date(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + 7);
+const drawDateTxt = (() => { const d = new Date(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + NEXT_DAYS);
   return `${d.getMonth() + 1}월 ${d.getDate()}일 토요일 20:35`; })();
 $("latest").innerHTML = `<h2>지난 회차 실제 당첨번호 — 제${LAST.no}회 <span class="tag">${fmtDate(LAST.ymd)} 추첨 완료</span></h2>
   <p class="warn">⚠️ 이미 끝난 추첨의 결과입니다. <b>추천 번호가 아닙니다.</b> 추천 번호는 아래 '번호 뽑기'에서 버튼을 눌러야 나옵니다.</p>
   <div class="balls" style="margin:10px 0">${LAST.n.map(ball).join("")}<span class="plus">+</span>${ball(LAST.b)}</div>
-  <p class="note">${!LAST.sales && !LAST.w1 ? "1등 당첨금 집계 중 (발표되면 자동 반영)" : LAST.w1 ? `1등 ${LAST.w1}명 · 1인당 ${won(LAST.a1)}` : "1등 당첨자 없음"} · 다음 추첨은 제${LAST.no + 1}회 (${drawDateTxt})</p>`;
+  <p class="note">${!LAST.sales && !LAST.w1 ? "1등 당첨금 집계 중 (발표되면 자동 반영)" : LAST.w1 ? `1등 ${LAST.w1}명 · 1인당 ${won(LAST.a1)}` : "1등 당첨자 없음"} · ${SALE_CLOSED ? `제${LAST.no + 1}회 판매 마감 · ` : ""}다음 추첨은 제${NEXT}회 (${drawDateTxt})</p>`;
 
 // ---------- 빈도 차트 ----------
 const tip = $("tip");
@@ -600,7 +605,7 @@ const OHS = ["목", "화", "토", "금", "수"];
 const DIGIT_OH = ["토", "수", "화", "목", "금", "토", "수", "화", "목", "금"]; // 끝자리 1·6 수, 2·7 화, 3·8 목, 4·9 금, 5·0 토
 const numOh = n => DIGIT_OH[n % 10];
 const ohDigits = o => DIGIT_OH.map((x, d) => x === o ? d : -1).filter(d => d >= 0).join("·");
-const drawDate = new Date(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + 7, 12);
+const drawDate = new Date(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + NEXT_DAYS, 12);
 const hashStr = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.codePointAt(0), 16777619); return h >>> 0; };
 let saju = null;
 
@@ -716,7 +721,7 @@ function renderSaju() {
       <b class="o-${GAN_OH[x.gan]}">${GAN_K[x.gan]}</b><b class="o-${JI_OH[x.ji]}">${JI_K[x.ji]}</b><small>${x.hanja}</small></div>`
       : `<div><small>시주</small><b>?</b><b>?</b><small>시간 모름</small></div>`).join("")}</div>
     ${OHS.map(o => `<div class="oh"><span class="o-${o}"><b>${o}</b></span><div><div class="fill" style="width:${s.cnt[o] / mxC * 100}%"></div></div><span>${s.cnt[o]}</span></div>`).join("")}
-    <p class="note">제${LAST.no + 1}회 추첨일(${drawDate.getMonth() + 1}/${drawDate.getDate()}) 일진은 <b>${gzK(s.draw)}(${s.draw.hanja})</b>입니다.
+    <p class="note">제${NEXT}회 추첨일(${drawDate.getMonth() + 1}/${drawDate.getDate()}) 일진은 <b>${gzK(s.draw)}(${s.draw.hanja})</b>입니다.
       부족한 오행일수록, 그리고 일진의 오행(${GAN_OH[s.draw.gan]}·${JI_OH[s.draw.ji]})일수록 가중치를 높였습니다.
       가장 힘을 주는 오행은 <b class="o-${best}">${best}</b>, 끝자리 ${ohDigits(best)}인 번호입니다.</p>
     <p class="note">오행 가중치: ${OHS.map(o => `${o} ${s.ohW[o]} (끝자리 ${ohDigits(o)})`).join(" · ")}</p>
@@ -1027,7 +1032,7 @@ function renderCelebRank() {
     + `<br>점수는 SAJOO식 오늘의 운세 계산(총점+재물운)이며, 번호 추천 시 누르는 순간마다 이 순위대로 게임에 배정됩니다.`;
 }
 $("again").onclick = generate;
-const shareText = () => `로또 6/45 제${LAST.no + 1}회 분석 조합\n` + current.map((c, i) => `${i + 1}. ${c.s.join(" ")} (${c.name})`).join("\n");
+const shareText = () => `로또 6/45 제${NEXT}회 분석 조합\n` + current.map((c, i) => `${i + 1}. ${c.s.join(" ")} (${c.name})`).join("\n");
 function copyText(t) { // 클립보드 API가 막힌 환경을 위한 옛 방식 복사
   const ta = document.createElement("textarea");
   ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";

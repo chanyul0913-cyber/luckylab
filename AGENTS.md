@@ -43,7 +43,7 @@
 - 순서: `fetch_lotto.py` → `fetch_rich.py` → (새 회차면) PyTorch 설치 후 `dl_train.py` → 데이터 바뀌면 봇이 커밋·push → `_site/` 만들어 Pages 배포.
 - 배포 때 `index.html`을 자동 치환한다. **이 두 표식을 지우거나 이름을 바꾸면 안 됨**:
   - `<script src="data.js">`, `dl.js`, `rich.js` → `?v=실행번호`가 붙음 (브라우저 캐시로 옛 데이터가 섞이는 것 방지)
-  - `const APP_VER = "__APP_VER__";` → 실행번호로 바뀌고 `version.json`도 생성 → 열어 둔 화면에 "🔄 새 버전이 나왔어요" 띠 표시
+  - `const APP_VER = "__APP_VER__";` → index.html·data.js·dl.js 내용의 해시로 바뀌고 `version.json`도 생성(포브스 순위만 바뀐 날은 띠 안 뜸) → 열어 둔 화면에 "🔄 새 버전이 나왔어요" 띠 표시
 - 로컬에서는 `__APP_VER__` 그대로라 새 버전 확인이 꺼져 있는 게 정상.
 
 ## index.html 핵심 구조 (바꿀 때 지켜야 할 약속)

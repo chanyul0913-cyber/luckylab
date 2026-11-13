@@ -58,10 +58,12 @@ jobs:
           # 브라우저가 예전 데이터 파일을 캐시해 새 페이지와 섞이지 않도록, 배포마다 주소에 버전을 붙임
           sed -i -E 's/src="(data|dl|rich)\.js"/src="\1.js?v=${{ github.run_id }}"/g' _site/index.html
           grep -o 'src="[a-z]*\.js?v=[0-9]*"' _site/index.html
-          # 새 버전 알림: 페이지에 이번 버전 번호를 새기고, 같은 번호를 version.json으로도 올림
-          sed -i 's/__APP_VER__/${{ github.run_id }}/' _site/index.html
-          echo '{"v":"${{ github.run_id }}"}' > _site/version.json
-          grep -c 'APP_VER = "${{ github.run_id }}"' _site/index.html
+          # 새 버전 알림: 화면(index.html)·당첨번호(data.js)·딥러닝(dl.js)이 바뀔 때만 번호가 바뀜
+          # (포브스 순위는 거의 매일 바뀌어 run_id를 쓰면 열어 둔 화면에 매일 띠가 떴음 — 순위는 띠 없이 다음 접속 때 반영)
+          V=$(cat index.html data.js dl.js | sha256sum | cut -c1-12)
+          sed -i "s/__APP_VER__/$V/" _site/index.html
+          echo "{\"v\":\"$V\"}" > _site/version.json
+          grep -c "APP_VER = \"$V\"" _site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

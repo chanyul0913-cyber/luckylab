@@ -607,9 +607,15 @@ let saju = null;
 function calcSaju(p) {
   if (!window.Solar || !window.Lunar) throw new Error("사주 계산 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.");
   const known = p.h !== "";
-  let solar = p.cal === "lunar"
-    ? Lunar.fromYmdHms(p.y, p.leap ? -p.m : p.m, p.d, known ? +p.h : 12, known ? +p.mi : 0, 0).getSolar()
-    : Solar.fromYmdHms(p.y, p.m, p.d, known ? +p.h : 12, known ? +p.mi : 0, 0);
+  if (!(p.y >= 1900 && p.y <= 2100)) throw new Error("1900년~2100년 사이만 계산할 수 있습니다.");
+  let solar;
+  try {
+    solar = p.cal === "lunar"
+      ? Lunar.fromYmdHms(p.y, p.leap ? -p.m : p.m, p.d, known ? +p.h : 12, known ? +p.mi : 0, 0).getSolar()
+      : Solar.fromYmdHms(p.y, p.m, p.d, known ? +p.h : 12, known ? +p.mi : 0, 0);
+  } catch { // 라이브러리의 영어 오류(wrong lunar year …) 대신 쉬운 안내
+    throw new Error(p.cal === "lunar" && p.leap ? `${p.y}년에는 음력 ${p.m}월 윤달이 없습니다. '윤달' 체크를 확인하세요.` : "존재하지 않는 날짜입니다.");
+  }
   const chk = new Date(solar.getYear(), solar.getMonth() - 1, solar.getDay());
   if (chk.getMonth() !== solar.getMonth() - 1) throw new Error("존재하지 않는 날짜입니다.");
   if (p.cal === "solar" && (solar.getMonth() !== p.m || solar.getDay() !== p.d)) throw new Error("존재하지 않는 날짜입니다.");
@@ -966,7 +972,8 @@ renderRows();
 
 // 백테스트 3+ 비율 상위 5개 전략 (무작위 기준·자기 자신 제외, 딥러닝은 3+ 기록이 있을 때만)
 function btRanking() {
-  const c = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].n)
+  const c = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].n
+      && (window.Solar || !["manse", "celeb", ...PROFILE].includes(k)) && (saju || !PROFILE.includes(k))) // 지금 못 돌리는 전략(인터넷 끊김·내 정보 없음)은 순위에서 빼서 게임이 비지 않게
     .map(k => ({ k, r3: BT[k].h3 / BT[k].n, mean: BT[k].hit / BT[k].n }));
   if (dl && dl.h3 != null) c.push({ k: "deep", r3: dl.h3 / dl.n, mean: dl.hit / dl.n, recent: true });
   return c.sort((a, b) => b.r3 - a.r3 || b.mean - a.mean).slice(0, 10); // 게임 수(최대 10)만큼 1~10위

@@ -873,8 +873,8 @@ const STRATS = {
   random: ["무작위 혼합형", "완전 무작위 (형태 필터만 적용)", R => pick6(R)],
   markov: ["마르코프 전이형", `직전 회차(${LAST.n.join(", ")}) 번호 다음 회차에 자주 나온 번호에 가중치 (GitHub 예측 프로젝트들의 '이전 회차 → 다음 회차' 방식)`, (R, c = LIVE) => pick6(R, c.markovW)],
   quantum: ["양자 확률진폭형", "양자역학을 빗댄 모델: 역대 빈도와 최근 빈도를 두 경로의 진폭으로 보고, 미출현 기간을 위상차로 간섭시켜 |ψ|²에 비례해 '측정'. 측정은 운영체제 하드웨어 난수 사용 (실제 양자 난수 아님)", (R, c = LIVE) => pick6(R, c.qW)],
-  deep: ["딥러닝 LSTM형", "GitHub 인기 예측 프로젝트(LotteryAi 등)와 같은 방식: 직전 10회를 보고 다음 회차를 예측하는 LSTM 신경망을 매주 GitHub 서버에서 학습해 둔 예측 확률로 가중치",
-    R => { const avg = dl.p.reduce((a, b) => a + b, 0) / 45; return pick6(R, [0, ...dl.p.map(v => (v / avg) ** 4)]); }],
+  deep: ["딥러닝 LSTM형", "GitHub 인기 예측 프로젝트(LotteryAi 등)와 같은 방식: 직전 10회를 보고 다음 회차를 예측하는 LSTM 신경망을 매주 GitHub 서버에서 학습해 둔 예측 확률로 가중치. 백테스트는 50회마다 그때까지의 데이터로만 다시 학습한 모델의 예측으로 계산(미래 데이터 차단)",
+    (R, c = LIVE) => { const p = c.dlP, avg = p.reduce((a, b) => a + b, 0) / 45; return pick6(R, [0, ...p.map(v => (v / avg) ** 4)]); }],
   saju: ["사주 오행형", "내 사주의 부족한 오행 + 추첨일 일진 오행 번호에 가중치를 두고 누를 때마다 새로 뽑습니다", (R, c = LIVE) => pick6(R, c.sajuW)],
   zodiac: ["별자리형", "내 태양 별자리 번호(양자리 1 … 물고기자리 12)와 12씩 더한 수, 같은 원소 별자리 번호, 추첨일 별자리 번호에 가중치", (R, c = LIVE) => pick6(R, c.zw)],
   astro: ["점성술형", "번호를 한 자리로 줄인 수(수비학)가 내 별자리 지배행성·태어난 요일 행성·생명수·추첨일 행성의 수와 같으면 가중치", (R, c = LIVE) => pick6(R, c.aw)],
@@ -909,8 +909,8 @@ STRATS.celeb = ["유명인사주형", "아래 유명인·세계 부자 TOP10 사
 // 실시간 추천에 쓰는 기준값 (백테스트는 회차마다 그 시점까지의 값으로 같은 함수를 부름)
 const LIVE = { qlo: q(0.1), qhi: q(0.9), prev: LAST.n, pastSet, freq, c50, overdue, markovW, qW,
   get sajuW() { return saju.w; }, get zw() { return saju.west.zw; }, get aw() { return saju.west.aw; }, get manseW() { return manse().w; },
-  get celebPlan() { return celebPlan(); } };
-STRATS.btop = ["백테스트형", "아래 백테스트 표에서 3개 이상 맞힌 비율(3+)이 높은 전략을 순위대로 게임에 배정: 1게임=1위, 2게임=2위 … 10게임=10위 (반복 없음, 동률이면 평균 일치가 높은 쪽). 후보 전략 수보다 게임이 많으면 남는 게임은 비워 둠. 딥러닝은 3+ 기록이 있을 때 최근 100회 기준으로 함께 비교. 순위 차이는 우연 범위이며, 이 방식 자체의 성적도 백테스트 표에 나옵니다", null];
+  get celebPlan() { return celebPlan(); }, get dlP() { return dl.p; } };
+STRATS.btop = ["백테스트형", "아래 백테스트 표에서 3개 이상 맞힌 비율(3+)이 높은 전략을 순위대로 게임에 배정: 1게임=1위, 2게임=2위 … 10게임=10위 (반복 없음, 동률이면 평균 일치가 높은 쪽). 후보 전략 수보다 게임이 많으면 남는 게임은 비워 둠. 딥러닝도 50회마다 다시 학습한 회차별 기록으로 다른 전략과 똑같이 비교. 순위 차이는 우연 범위이며, 이 방식 자체의 성적도 백테스트 표에 나옵니다", null];
 const PROFILE = ["saju", "zodiac", "astro"]; // 내 정보가 필요한 전략
 const SKEYS = Object.keys(STRATS);
 const GROUPS = [["통계형", ["balance", "recent", "overdue", "spread"]], ["AI·모델형", ["deep", "markov", "quantum"]], ["백테스트형", ["btop"]],
@@ -978,9 +978,9 @@ renderRows();
 // 백테스트 3+ 비율 상위 5개 전략 (무작위 기준·자기 자신 제외, 딥러닝은 3+ 기록이 있을 때만)
 function btRanking() {
   const c = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].n
-      && (window.Solar || !["manse", "celeb", ...PROFILE].includes(k)) && (saju || !PROFILE.includes(k))) // 지금 못 돌리는 전략(인터넷 끊김·내 정보 없음)은 순위에서 빼서 게임이 비지 않게
+      && (window.Solar || !["manse", "celeb", ...PROFILE].includes(k)) && (saju || !PROFILE.includes(k)) && (k !== "deep" || dl)) // 지금 못 돌리는 전략(인터넷 끊김·내 정보 없음)은 순위에서 빼서 게임이 비지 않게
     .map(k => ({ k, r3: BT[k].h3 / BT[k].n, mean: BT[k].hit / BT[k].n }));
-  if (dl && dl.h3 != null) c.push({ k: "deep", r3: dl.h3 / dl.n, mean: dl.hit / dl.n, recent: true });
+  if (!BT.deep && dl && dl.h3 != null) c.push({ k: "deep", r3: dl.h3 / dl.n, mean: dl.hit / dl.n, recent: true });
   return c.sort((a, b) => b.r3 - a.r3 || b.mean - a.mean).slice(0, 10); // 게임 수(최대 10)만큼 1~10위
 }
 function generate() {
@@ -1231,7 +1231,7 @@ renderCelebRank(); // 열자마자 이번 주 유명인 운세 순위를 준비
 // ---------- 백테스트 (각 회차는 직전 회차까지만 사용) ----------
 // 실제 추천과 같은 전략 함수·같은 형태 필터를, 회차마다 그 이전 데이터로 만든 기준값으로 돌림 (미래 데이터 차단)
 const BT_START = 101, BT = {};
-const BT_CACHE_VER = 1;   // 전략·제외 규칙·점수 계산을 바꿀 때 1씩 올린다 (지난 백테스트 캐시 무효화)
+const BT_CACHE_VER = 2;   // 전략·제외 규칙·점수 계산을 바꿀 때 1씩 올린다 (지난 백테스트 캐시 무효화)
 let btFromCache = false;
 function loadBTCache() { // 새 회차·같은 코드면 지난 백테스트 결과를 그대로 씀 (재방문 시 수십 초 절약)
   try {
@@ -1270,7 +1270,7 @@ function runBacktest(keys, done) {
           get sajuW() { return sajuWeightsAt(saju.cnt, drawDay(d)).w; },
           get zw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).zw; },
           get aw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).aw; },
-          get celebPlan() { return celebBlendAt(drawDay(d)); } };
+          get celebPlan() { return celebBlendAt(drawDay(d)); }, get dlP() { return DLH.p[i - (DLH.from - 1)].map(v => v / 1000); } };
         const win = new Set(d.n);
         // 비싼 가중치(markovW·qW·manseW·sajuW·zw·aw)는 회차당 한 번만 계산해 모든 전략이 공유
         for (const key of ["markovW", "qW", "manseW", "sajuW", "zw", "aw", "celebPlan"]) {
@@ -1309,7 +1309,7 @@ try { importScripts("https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.j
 const ${Object.entries(consts).map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join(", ")};
 const PRIMES = new Set(${JSON.stringify([...PRIMES])});
 ${fns.map(f => `const ${f.name} = ${f};`).join("\n")}
-let N = 0, saju = null, celebData = [], KEYS = [], STRATS = {}, res = null, DONE = null;
+let N = 0, saju = null, DLH = null, celebData = [], KEYS = [], STRATS = {}, res = null, DONE = null;
 function celebList() { return celebData; }
 let fr, ls, tr, oc, sumsH, past, i;
 function run(keys, done) {
@@ -1333,7 +1333,7 @@ function step() {
         get sajuW() { return sajuWeightsAt(saju.cnt, drawDay(d)).w; },
         get zw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).zw; },
         get aw() { return westWeightsAt(saju.west.sign, saju.west.life, saju.west.wday, drawDay(d)).aw; },
-        get celebPlan() { return celebBlendAt(drawDay(d)); } };
+        get celebPlan() { return celebBlendAt(drawDay(d)); }, get dlP() { return DLH.p[i - (DLH.from - 1)].map(v => v / 1000); } };
       const win = new Set(d.n);
       for (const key of ["markovW", "qW", "manseW", "sajuW", "zw", "aw", "celebPlan"]) {
         const raw = Object.getOwnPropertyDescriptor(ctx, key).get; let v;
@@ -1358,7 +1358,7 @@ function step() {
 onmessage = e => {
   const m = e.data;
   if (m.cmd !== "run") return;
-  N = m.N; saju = m.saju; celebData = m.celeb; DATA = m.D;
+  N = m.N; saju = m.saju; DLH = m.dlh; celebData = m.celeb; DATA = m.D;
   STRATS = {};
   for (const [k, s] of m.strats) STRATS[k] = [k, "", eval("(" + s + ")")];
   run(m.keys, r => postMessage({ done: r }));
@@ -1376,7 +1376,7 @@ function startBT(keys, done) { // 워커로 백테스트(별도 스레드, 화�
     btW.onerror = e => { window.__btWerr = e.message || "오류"; console.warn("백테스트 워커 실패 — 기존 방식으로 계산:", e.message || e); btW = null; fail(); };
     btW.postMessage({ cmd: "run", N, keys,
       D: D.map(d => ({ no: d.no, ymd: d.ymd, n: d.n })),
-      celeb: celebList(), saju: saju ? { cnt: saju.cnt, west: { sign: saju.west.sign, life: saju.west.life, wday: saju.west.wday } } : null,
+      dlh: keys.includes("deep") ? DLH : null, celeb: celebList(), saju: saju ? { cnt: saju.cnt, west: { sign: saju.west.sign, life: saju.west.life, wday: saju.west.wday } } : null,
       strats: keys.map(k => [k, STRATS[k][2].toString()]) });
   } catch { fail(); }
 }
@@ -1415,12 +1415,13 @@ function renderBT() {
     + ` <span id="btRecalc" role="button" style="text-decoration:underline;cursor:pointer;color:var(--ink2)">🔄 다시 계산</span>`;
   $("bt").innerHTML = "<tr><th>전략</th><th>평균 일치</th><th>3개+</th><th>4개+</th><th>z</th><th>판정</th></tr>" + rows.map(k => {
     const name = STRATS[k][0];
-    if (k === "deep") { const mean = dl.hit / dl.n, z = (mean - MU) / Math.sqrt(VAR / dl.n), has3 = dl.h3 != null;
+    if (k === "deep" && !BT.deep) { const mean = dl.hit / dl.n, z = (mean - MU) / Math.sqrt(VAR / dl.n), has3 = dl.h3 != null;
       return `<tr><td>${name} <small class="note">최근 100회만</small></td><td>${mean.toFixed(3)}</td><td>${has3 ? (dl.h3 / dl.n * 100).toFixed(2) + "%" : "-"}</td><td>${has3 ? dl.h4 : "-"}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`; }
     const r = BT[k];
     if (!r) return `<tr><td>${name}</td><td colspan="5" class="note" style="text-align:left">${saju ? "계산 중…" : "내 정보 입력 후 계산됩니다"}</td></tr>`;
     const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n);
     const who = PROFILE.includes(k) && saju ? ` <small class="note">${saju.name ? esc(saju.name) + " 기준" : "내 사주 기준"}</small>`
+      : k === "deep" ? ` <small class="note">50회마다 다시 학습</small>`
       : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 10개로 1게임씩${r.saju ? ", 사주 계열 포함" : ""}</small>` : "";
     return `<tr><td>${name}${who}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`;
   }).join("");
@@ -1502,11 +1503,21 @@ window.selfTest = async function selfTest() {
   return res;
 };
 window.btReady = true;
+// 딥러닝 회차별 기록(dlhist.json): 50회마다 다시 학습한 모델이 '그 회차 전에' 낸 예측 — 딥러닝도 다른 전략처럼 백테스트하기 위함
+let DLH = null;
+async function loadDLH() {
+  if (DLH || !dl) return DLH;
+  try {
+    const h = await (await fetch(`dlhist.json?n=${N}`)).json();
+    if (h.last === N && h.from === BT_START && h.p.length === N - BT_START + 1) DLH = h; // 최신 회차까지 빠짐없이 있을 때만 사용
+  } catch {} // 없거나 못 받으면 예전처럼 최근 100회 성적만 표시
+  return DLH;
+}
 function runBaseBT() { // 기본 전략 백테스트 전체 다시 계산 (캐시 무시)
   Object.keys(BT).forEach(k => delete BT[k]);
   btProfileKey = null;
   btFromCache = false; btBusy = true; renderBT();
-  startBT(baseKeys, res => { Object.assign(BT, res); btBusy = false; computeMeta(); saveBTCache(); renderBT(); backtestProfile(); });
+  loadDLH().then(() => startBT(DLH ? baseKeys.concat("deep") : baseKeys, res => { Object.assign(BT, res); btBusy = false; computeMeta(); saveBTCache(); renderBT(); backtestProfile(); }));
 }
 if (loadBTCache()) { renderBT(); backtestProfile(); } // 같은 코드·같은 회차면 지난 결과를 그대로 표시
 else runBaseBT();

@@ -2,7 +2,9 @@
 직전 10회 당첨번호(45칸 0/1)를 순서대로 보고 다음 회차 45개 번호의 출현 확률을 출력한다.
 1) 최근 100회를 빼고 학습 -> 그 100회를 한 회씩 예측해 성적 측정 (미래 데이터 차단)
 2) 전체로 다시 학습 -> 다음 회차 확률을 dl.js에 저장
-사용: python dl_train.py   (dl.js가 이미 최신 회차면 건너뜀, --force로 강제)
+3) 회차별 기록 dlhist.json: 101회부터 매 회차를, 50회마다 '그때까지의 데이터로만' 다시 학습한 모델로 예측해 둠
+   (사이트 백테스트가 딥러닝도 다른 전략과 똑같이 채점하는 데 씀. 새 회차분만 이어서 계산)
+사용: python dl_train.py   (dl.js·dlhist.json이 이미 최신 회차면 건너뜀, --force로 dl.js 강제)
 """
 import csv, json, math, os, sys
 from datetime import date
@@ -12,7 +14,9 @@ from torch import nn
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "dl.js")
+HIST = os.path.join(HERE, "dlhist.json")
 W, EPOCHS, HOLD, UNITS = 10, 30, 100, 32
+STEP, FROM, HVER = 50, 100, 1  # 50회마다 재학습, 0부터 센 100번째 = 101회(사이트 BT_START), 기록 형식 버전
 
 draws = []
 with open(os.path.join(HERE, "lotto645.csv"), encoding="utf-8-sig") as f:
@@ -21,10 +25,22 @@ with open(os.path.join(HERE, "lotto645.csv"), encoding="utf-8-sig") as f:
             draws.append([int(x) for x in r[2:8]])
 N = len(draws)
 
+def load_hist():
+    try:
+        with open(HIST, encoding="utf-8") as f:
+            h = json.load(f)
+        return h if h.get("ver") == HVER and h.get("step") == STEP and h.get("from") == FROM + 1 else None
+    except Exception:
+        return None
+
+
+dl_fresh = False
 if "--force" not in sys.argv and os.path.exists(OUT):
     with open(OUT, encoding="utf-8") as f:
-        if json.loads(f.read().split("=", 1)[1].rstrip().rstrip(";"))["last"] == N:
-            print(f"dl.js가 이미 {N}회 기준이라 건너뜀"); sys.exit(0)
+        dl_fresh = json.loads(f.read().split("=", 1)[1].rstrip().rstrip(";"))["last"] == N
+hist0 = load_hist()
+if dl_fresh and hist0 and hist0["last"] == N:
+    print(f"dl.js·dlhist.json이 이미 {N}회 기준이라 건너뜀"); sys.exit(0)
 
 hot = np.zeros((N, 45), dtype=np.float32)
 for i, ns in enumerate(draws):
@@ -65,6 +81,26 @@ def predict(m, end):
     with torch.no_grad():
         return torch.sigmoid(m(torch.tensor(hot[None, end - W:end]))).numpy()[0]
 
+
+def build_hist():
+    """회차별 기록: 회차 i(0부터)는 STEP의 배수 b = i//STEP*STEP 까지의 데이터로만 학습한 모델로 예측 (i 이후는 안 봄)."""
+    h = load_hist()
+    ps = h["p"][:N - FROM] if h else []
+    mb, m = None, None
+    for i in range(FROM + len(ps), N):
+        b = i // STEP * STEP
+        if b != mb:
+            m, mb = train(b), b
+        ps.append([int(round(float(v) * 1000)) for v in predict(m, i)])  # 천분율 정수로 저장 (파일 크기 절약)
+    assert len(ps) == N - FROM and all(len(x) == 45 for x in ps)
+    with open(HIST, "w", encoding="utf-8") as f:
+        json.dump({"ver": HVER, "step": STEP, "from": FROM + 1, "last": N, "p": ps}, f, separators=(",", ":"))
+    print(f"dlhist.json 저장: {FROM + 1}~{N}회 {len(ps)}회분")
+
+
+build_hist()
+if dl_fresh:
+    print("dl.js는 이미 최신이라 회차별 기록만 갱신"); sys.exit(0)
 
 # 1) 홀드아웃 검증: 상위 30개를 겹치지 않게 5게임으로 나눠 실제와 비교 (백테스트 표와 같은 방식)
 cut = N - HOLD

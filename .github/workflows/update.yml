@@ -54,13 +54,14 @@ jobs:
           git diff --cached --quiet || { git commit -m "data: 자동 갱신 (로또 회차·포브스 순위)"; git push; }
       - name: 사이트 파일 모으기
         run: |
-          mkdir _site && cp index.html data.js dl.js rich.js sw.js manifest.webmanifest icon-192.png icon-512.png sitemap.xml dlhist.json _site/
+          mkdir _site && cp -r index.html style.css js data.js dl.js rich.js sw.js manifest.webmanifest icon-192.png icon-512.png sitemap.xml dlhist.json _site/
           # 브라우저가 예전 데이터 파일을 캐시해 새 페이지와 섞이지 않도록, 배포마다 주소에 버전을 붙임
-          sed -i -E 's/src="(data|dl|rich)\.js"/src="\1.js?v=${{ github.run_id }}"/g' _site/index.html
-          grep -o 'src="[a-z]*\.js?v=[0-9]*"' _site/index.html
-          # 새 버전 알림: 화면(index.html)·당첨번호(data.js)·딥러닝(dl.js)이 바뀔 때만 번호가 바뀜
+          # (데이터 3개 + 화면 코드 js/*.js + style.css. 바깥 주소(https://…)는 ':'가 있어 안 걸림)
+          sed -i -E 's#(src|href)="([a-z/]+)\.(js|css)"#\1="\2.\3?v=${{ github.run_id }}"#g' _site/index.html
+          grep -o '="[a-z/]*\.\(js\|css\)?v=[0-9]*"' _site/index.html
+          # 새 버전 알림: 화면(index.html·style.css·js/)·당첨번호(data.js)·딥러닝(dl.js)이 바뀔 때만 번호가 바뀜
           # (포브스 순위는 거의 매일 바뀌어 run_id를 쓰면 열어 둔 화면에 매일 띠가 떴음 — 순위는 띠 없이 다음 접속 때 반영)
-          V=$(cat index.html data.js dl.js | sha256sum | cut -c1-12)
+          V=$(cat index.html style.css js/*.js data.js dl.js | sha256sum | cut -c1-12)
           sed -i "s/__APP_VER__/$V/" _site/index.html
           echo "{\"v\":\"$V\"}" > _site/version.json
           grep -c "APP_VER = \"$V\"" _site/index.html

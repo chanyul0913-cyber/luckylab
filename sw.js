@@ -1,8 +1,8 @@
 // 로분소 서비스 워커: 홈 화면 추가(PWA)와 오프라인에서 마지막 화면 열기 지원
 // 매주 바뀌는 회차 데이터는 '네트워크 우선'(실패 시 캐시), CDN 라이브러리·글꼴·아이콘은 '캐시 우선'
-const VER = "robunso-2"; // 화면 파일 구조를 바꿨으면 이 버전을 1 올려 옛 캐시를 비운다
+const VER = "robunso-3"; // 화면 파일 구조를 바꿨으면 이 버전을 1 올려 옛 캐시를 비운다
 // version.json은 넣지 않음: 5분마다 새 버전을 서버에 직접 물어보는 용도라 저장할 필요가 없음
-const CORE = ["./", "index.html", "data.js", "dl.js", "rich.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+const CORE = ["./", "index.html", "style.css", "js/core.js", "js/fortune.js", "js/strategies.js", "js/backtest.js", "js/selftest.js", "data.js", "dl.js", "rich.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VER).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

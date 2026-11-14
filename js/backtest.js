@@ -4,7 +4,7 @@
 // ---------- 백테스트 (각 회차는 직전 회차까지만 사용) ----------
 // 실제 추천과 같은 전략 함수·같은 형태 필터를, 회차마다 그 이전 데이터로 만든 기준값으로 돌림 (미래 데이터 차단)
 const BT_START = 101, BT = {};
-const BT_CACHE_VER = 2;   // 전략·제외 규칙·점수 계산을 바꿀 때 1씩 올린다 (지난 백테스트 캐시 무효화)
+const BT_CACHE_VER = 3;   // 전략·제외 규칙·점수 계산을 바꿀 때 1씩 올린다 (지난 백테스트 캐시 무효화)
 let btFromCache = false;
 function loadBTCache() { // 새 회차·같은 코드면 지난 백테스트 결과를 그대로 씀 (재방문 시 수십 초 절약)
   try {
@@ -18,7 +18,7 @@ function loadBTCache() { // 새 회차·같은 코드면 지난 백테스트 결
 function saveBTCache() { // 기본 전략(+백테스트형)만 저장 — 사주 계열은 사람별이라 매번 계산
   try {
     const stats = {};
-    for (const k of Object.keys(BT)) if (!PROFILE.includes(k) && BT[k] && BT[k].n) stats[k] = { hit: BT[k].hit, h3: BT[k].h3, h4: BT[k].h4, n: BT[k].n };
+    for (const k of Object.keys(BT)) if (!PROFILE.includes(k) && BT[k] && BT[k].n) stats[k] = { hit: BT[k].hit, h3: BT[k].h3, h4: BT[k].h4, n: BT[k].n, rc: recent50(k) }; // rc: TOP3의 최근 50회 성적
     localStorage.setItem("lottoBT", JSON.stringify({ ver: BT_CACHE_VER, last: N, stats }));
   } catch {}
 }

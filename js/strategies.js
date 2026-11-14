@@ -103,7 +103,7 @@ const optHtml = sel => GROUPS.map(([g, ks]) => `<optgroup label="${g}">`
 $("stratHelp").innerHTML = GROUPS.map(([g, ks]) => `<b style="color:var(--accent-text)">${g}</b><br>` + ks.map(k => `<b>${optLabel(k)}</b> — ${STRATS[k][1]}`).join("<br>")).join("<br><br>") + "<br>"
   + "<br>모든 전략에 공통으로, 1~31만으로 된 조합·세 번호 연속·등차수열·한 구간 몰림·역대 1등 조합을 거르고 게임끼리 3개 이상 겹치지 않게 합니다.<br><b>추가 제외 규칙</b> — 합성수 5개 이상 · 공 색상 5가지가 모두 들어간 조합 · 소수 0개 또는 5개 이상 · 용지 가로줄(1~7, 8~14 …) 한 줄에 4개 이상이거나 6개가 모두 다른 줄인 조합 · 용지 세로줄(1·8·15 …) 한 줄에 4개 이상 · 3의 배수 5개 이상 · 5의 배수 4개 이상 · 직전 회차 번호(이월수) 3개 이상. 이 규칙들은 취향에 따른 필터이며 1등 확률을 바꾸지 않습니다.";
 $("gameCount").innerHTML = Array.from({ length: 10 }, (_, i) => `<option${i === 4 ? " selected" : ""}>${i + 1}</option>`).join("");
-$("allStrat").innerHTML = `<option value="">게임별로 고르기</option><option value="__saju">🔮 내 사주 맞춤 배분</option>` + optHtml("");
+$("allStrat").innerHTML = `<option value="">게임별로 고르기</option><option value="__saju">🔮 내 사주 맞춤 배분</option><option value="__top3">🏆 이번 주 화제의 전략 TOP3</option>` + optHtml("");
 
 // ---------- 사주 맞춤 배분 ----------
 // 채워야 할 오행(가중치가 큰 오행)에 어울리는 전략으로 게임을 나눔. 명리 해석상 '어울림'이며 확률 차이는 없음
@@ -132,6 +132,42 @@ function applySajuPlan() {
   return true;
 }
 
+// ---------- 이번 주 화제의 전략 TOP3 (재미용 큐레이션 — 확률이 높은 전략을 고르는 게 아님) ----------
+function recent50(k) { // 최근 50회 성적: 백테스트 회차별 기록(g)에서 계산, 캐시로 불러왔으면 저장해 둔 rc
+  const r = BT[k]; if (!r) return null;
+  if (r.rc) return r.rc;
+  if (!r.g) return null;
+  let hit = 0, h3 = 0, n = 0;
+  for (let i = Math.max(0, N - 50) * 5; i < N * 5; i++) { const h = r.g[i]; if (h < 0) continue; n++; hit += h; h3 += h >= 3; }
+  return n ? { hit, h3, n } : null;
+}
+function top3Plan() {
+  const rk = btRanking(); if (!rk.length) return null; // 백테스트 계산 전
+  const pick = [{ k: rk[0].k, why: `<b>과거 성적 1위</b> ${STRATS[rk[0].k][0]}(3개+ ${(rk[0].r3 * 100).toFixed(2)}%)` }];
+  const used = k => pick.some(p => p.k === k);
+  const rec = rk.map(r => ({ k: r.k, s: recent50(r.k) })).filter(r => r.s && !used(r.k))
+    .sort((a, b) => b.s.hit / b.s.n - a.s.hit / a.s.n || b.s.h3 - a.s.h3)[0];
+  if (rec) pick.push({ k: rec.k, why: `<b>최근 50회 1위</b> ${STRATS[rec.k][0]}(평균 ${(rec.s.hit / rec.s.n).toFixed(2)}개 일치)` });
+  const m = manse(); // 이번 추첨 시각의 가장 강한 오행에 어울리는 전략 (사주 맞춤 배분과 같은 짝)
+  if (m) {
+    const o = OHS.slice().sort((a, b) => m.cnt[b] - m.cnt[a] || OHS.indexOf(a) - OHS.indexOf(b))[0];
+    const k = OH_STRATS[o].find(k => !used(k) && (saju || !PROFILE.includes(k)) && (k !== "deep" || dl));
+    if (k) pick.push({ k, why: `<b>이번 주 기운</b> ${STRATS[k][0]}(제${NEXT}회 추첨 시각에 <b class="o-${o}">${o}</b>·${OH_MEAN[o]} 기운이 가장 강함)` });
+  }
+  for (const r of rk) if (pick.length < 3 && !used(r.k)) pick.push({ k: r.k, why: `<b>과거 성적 다음 순위</b> ${STRATS[r.k][0]}` });
+  return pick;
+}
+function applyTop3() {
+  const p = top3Plan();
+  if (!p) { $("planNote").innerHTML = `<span class="warn" style="display:block">백테스트를 계산하는 중입니다. 잠시 후 다시 골라 주세요.</span>`; $("allStrat").value = ""; return false; }
+  const n = +$("gameCount").value;
+  choice = Array.from({ length: n }, (_, i) => p[i % p.length].k); renderRows(); $("allStrat").value = "__top3";
+  $("planNote").innerHTML = `🏆 이번 주 화제의 전략 TOP3 — ` + p.map((x, i) => `${i + 1}. ${x.why}`).join(" · ")
+    + (n !== p.length ? ` (게임 ${n}개에 이 순서로 돌아가며 배정)` : "")
+    + `. 지난 기록과 이번 주 기운으로 고른 <b>재미용 추천</b>이며, 어떤 전략이든 1등 확률은 똑같습니다. 과거 성적이 좋은 전략을 고르는 방식 자체도 백테스트에서 무작위보다 낫지 않았습니다.`;
+  return true;
+}
+
 let choice = SKEYS.slice(0, 5), current = [];
 function renderRows() {
   const n = +$("gameCount").value;
@@ -146,12 +182,14 @@ function renderRows() {
 $("gameCount").onchange = () => {
   const v = $("allStrat").value;
   if (v === "__saju") applySajuPlan();
+  else if (v === "__top3") applyTop3();
   else if (v) { choice = Array(+$("gameCount").value).fill(v); renderRows(); $("allStrat").value = v; } // 전체 전략을 고른 상태면 늘어난 게임도 같은 전략
   else renderRows();
 };
 $("allStrat").onchange = () => {
   const v = $("allStrat").value; $("planNote").innerHTML = "";
   if (v === "__saju") applySajuPlan();
+  else if (v === "__top3") { $("gameCount").value = "3"; applyTop3(); } // TOP3는 3게임부터 (늘리면 돌아가며 배정)
   else if (v) { choice = choice.map(() => v); renderRows(); $("allStrat").value = v; }
 };
 renderRows();

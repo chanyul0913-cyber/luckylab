@@ -10,6 +10,8 @@ function loadBTCache() { // 새 회차·같은 코드면 지난 백테스트 결
   try {
     const c = JSON.parse(localStorage.getItem("lottoBT") || "null");
     if (!c || c.ver !== BT_CACHE_VER || c.last !== N || !c.stats) return false;
+    // 인터넷이 끊겼을 때 저장한 결과엔 만세력·유명인·딥러닝 기록이 빠져 있음 → 지금 돌릴 수 있는 전략이 빠졌으면 다시 계산
+    if (baseKeys.concat(dl ? ["deep"] : []).some(k => !c.stats[k])) return false;
     for (const k of Object.keys(c.stats)) BT[k] = c.stats[k];
     btFromCache = true;
     return true;

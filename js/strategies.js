@@ -154,6 +154,7 @@ function top3Plan(n) {
   if (m) OHS.slice().sort((a, b) => m.cnt[b] - m.cnt[a] || OHS.indexOf(a) - OHS.indexOf(b)).forEach((o, j) =>
     OH_STRATS[o].forEach(k => { if ((saju || !PROFILE.includes(k)) && (k !== "deep" || dl))
       lists[2].push({ k, why: `이번 주 기운 ${j + 1}순위 ${STRATS[k][0]}(제${NEXT}회 추첨 시각 <b class="o-${o}">${o}</b>·${OH_MEAN[o]} 기운 ${m.cnt[o]}개)` }); }));
+  else lists[2].push({ k: "random", why: `무작위 혼합형(인터넷 연결이 없어 이번 주 기운 대신)` }); // 만세력을 못 불러와도 돌릴 수 있는 전략은 다 쓰게
   const pick = [], ptr = [0, 0, 0];
   for (let g = 0; pick.length < n && g < n * 3; g++) { // 한 기준이 바닥나면 다음 기준으로
     const c = g % 3, L = lists[c];
@@ -179,7 +180,7 @@ function renderRows() {
   choice.length = n; current = [];
   $("copy").disabled = true;
   $("sets").innerHTML = choice.map((k, i) => `<div class="set"><span class="idx">${i + 1}게임</span>
-    <select data-i="${i}" aria-label="${i + 1}게임 전략">${optHtml(k)}</select>
+    <select data-i="${i}" aria-label="${i + 1}게임 전략">${k === "__none" ? '<option value="__none" selected disabled>— 배정할 전략 없음 —</option>' : ""}${optHtml(k)}</select>
     <div class="balls" id="res${i}" style="grid-column:2"></div><div class="why" id="why${i}"></div></div>`).join("");
   $("sets").querySelectorAll("select").forEach(el => el.onchange = () => { choice[+el.dataset.i] = el.value; $("allStrat").value = ""; $("planNote").innerHTML = ""; });
 }

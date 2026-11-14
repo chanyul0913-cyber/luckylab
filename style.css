@@ -4,7 +4,9 @@
   --brand:#1e3a8a;--brand-ink:#ffffff;--accent:#d4a017;--accent-text:#8a6406;--accent-ink:#1a1300;
   --bar:#3b6fb6;--bar2:#9cb6dc;--good:#2e7d4f;--warn:#b45309;
   --shadow:0 1px 2px rgba(16,24,40,.05),0 2px 8px rgba(16,24,40,.06);
+  color-scheme:light dark; /* 브라우저 기본 부품(선택 칸 목록·숫자 화살표·스크롤바)도 다크 모드를 따르게 */
 }
+:root[data-theme="light"]{color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0f1218;--card:#1a1e27;--ink:#eceef2;--ink2:#b6bac4;--muted:#9aa0ab;--line:#2c313c;
   --brand:#8fb0ff;--brand-ink:#0f1218;--accent:#e0b44c;--accent-text:#e8c25e;--accent-ink:#1a1300;
@@ -12,7 +14,7 @@
 :root[data-theme="dark"]{
   --bg:#0f1218;--card:#1a1e27;--ink:#eceef2;--ink2:#b6bac4;--muted:#9aa0ab;--line:#2c313c;
   --brand:#8fb0ff;--brand-ink:#0f1218;--accent:#e0b44c;--accent-text:#e8c25e;--accent-ink:#1a1300;
-  --bar:#6f9be0;--bar2:#3b4f72;--good:#5cc28a;--warn:#f0a35a;--shadow:none;}
+  --bar:#6f9be0;--bar2:#3b4f72;--good:#5cc28a;--warn:#f0a35a;--shadow:none;color-scheme:dark;}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Pretendard Variable",Pretendard,-apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
   -webkit-font-smoothing:antialiased;letter-spacing:-.01em}

@@ -64,6 +64,7 @@
   - 딥러닝은 `dlhist.json`(`DLH`)이 최신 회차까지 있으면 기준값 `c.dlP`로 다른 전략과 똑같이 백테스트, 없으면 예전처럼 `dl.js`의 최근 100회 성적만 표시.
 - 토요일 20:00(KST) 판매 마감 뒤 새 회차 반영 전에는 `SALE_CLOSED`가 참 → `NEXT`(대상 회차)·`drawDate`가 한 주 뒤로 넘어감. 다음 회차 번호는 `LAST.no + 1` 대신 `NEXT`를 쓴다.
 - 백테스트 결과는 localStorage(`lottoBT`)에 캐시된다. **전략·제외 규칙·점수 계산을 바꿨으면 `BT_CACHE_VER`를 반드시 1 올려** 지난 캐시를 무효화한다(안 올리면 옛 성적이 그대로 보인다).
+- 외부 파일(`lunar.js`, Pretendard CSS)은 `integrity`(sha384 지문)로 위조를 막는다. **버전을 바꾸면 지문을 새로 계산**해야 한다(`curl -s 주소 | openssl dgst -sha384 -binary | openssl base64 -A`). 틀리면 그 파일이 막혀 사주 기능·글꼴이 꺼진다. 워커의 `importScripts`는 지문을 못 붙여 그대로.
 - 사주 계산: 외부 라이브러리 `lunar-javascript@1.7.7`(jsdelivr). 시간 30분 보정(서울 경도). 인터넷이 없으면 사주·만세력·유명인사주형만 꺼지고 나머지는 동작해야 함.
 - 저장: 브라우저 localStorage만 사용(`lottoSaju`, `lottoSajuList`). 서버로 개인정보를 보내지 않는다.
 - 서비스 워커는 배포된 사이트(https)에서만 등록된다. localhost·file://에서는 꺼져 있으니 개발 시 캐시 걱정 불필요.

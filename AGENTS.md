@@ -29,7 +29,7 @@
 | `index.html` | 화면 뼈대(HTML)와 새 버전 확인 코드(맨 끝 `<script>`, 배포 때 `APP_VER` 치환 대상) | 예 |
 | `style.css` | 화면 디자인 전체 | 예 |
 | `js/core.js` → `fortune.js` → `strategies.js` → `backtest.js` → `selftest.js` | 화면 코드. **이 순서로 읽히는 한 덩어리 프로그램**(각 파일 첫 줄에 역할). core: 데이터·통계·차트·검정 / fortune: 사주·만세력·유명인·별자리·딥러닝 가중치 / strategies: 전략 목록·제외 규칙·번호 뽑기·사주 입력 / backtest: 백테스트·워커·결과 표 / selftest: 자가 점검·첫 백테스트 시작 | 예 |
-| `fetch_lotto.py` | 동행복권에서 당첨번호 수집 → `lotto645.csv`, `data.js` 생성. 당첨금 발표 전에 받은 회차(판매액 0)는 다음 실행 때 다시 받아 채움 | 예 |
+| `fetch_lotto.py` | 동행복권에서 당첨번호 수집 → `lotto645.csv`, `data.js` 생성. 요청마다 최대 3번 재시도. 당첨금 발표 전에 받은 회차(판매액 0)는 다음 실행 때 다시 받아 채움 | 예 |
 | `dl_train.py` | 딥러닝(LSTM, PyTorch) 학습 → `dl.js`(다음 회차 예측), `dlhist.json`(101회부터 회차별 예측: 50회마다 그때까지 데이터로만 다시 학습, 천분율 정수, 새 회차분만 이어서 계산). 새 회차가 있을 때만 학습, 직전 예측을 `prev`로 보관. 형식을 바꾸면 `HVER`를 올림 | 예 |
 | `fetch_rich.py` | 포브스 실시간 부자 순위(비공식 내부 주소) → `rich.js`. 실패하면 기존 파일 유지. 출력에 `ver` 필드 — 형식을 바꿀 때 1씩 올리고 화면(index.html)도 같이 고침 | 예 |
 | `analyze.py` → `analysis_result.txt` | 초기 Python 독립 분석 보고서 (사이트와 별개) | 필요할 때만 |
@@ -37,7 +37,7 @@
 | `.github/workflows/update.yml` | 자동 갱신·배포 파이프라인 | 예 (신중히) |
 | `manifest.webmanifest`, `icon-192.png`, `icon-512.png` | PWA 홈 화면 추가용 아이콘·정보 | 거의 안 고침 |
 | `sitemap.xml` | 검색엔진(구글 서치 콘솔·네이버 서치어드바이저)에 직접 제출할 사이트 목록. `robots.txt`는 주소 맨 앞(도메인 뿌리)에만 효력이 있어 `/luckylab/` 아래에선 의미가 없으므로 만들지 않음 — 도메인을 옮기면 그때 추가 | 주소 바뀔 때만 |
-| `sw.js` | 서비스 워커: 홈 화면 추가·오프라인. 회차 데이터는 네트워크 우선이라 갱신 자동 반영, **화면 파일 구조를 바꿨으면 `VER`을 1 올려** 옛 캐시를 비운다 | 예 (신중히) |
+| `sw.js` | 서비스 워커: 홈 화면 추가·오프라인. **저장 공간(Cache Storage)은 같은 github.io 주소의 다른 사이트(예: hanyeon)와 함께 쓰므로 옛 캐시는 `robunso-`로 시작하는 것만 지운다.** localStorage도 함께 쓰니 키 이름은 `lotto…`로 시작하게. 회차 데이터는 네트워크 우선이라 갱신 자동 반영, **화면 파일 구조를 바꿨으면 `VER`을 1 올려** 옛 캐시를 비운다 | 예 (신중히) |
 | `.claude/launch.json` | Claude 미리보기용 로컬 서버 설정 (git 제외) | — |
 
 ## 자동 갱신·배포 (GitHub Actions `update.yml`)
@@ -62,6 +62,7 @@
 - 백테스트: `runBacktest` → `BT[키]`, 101회부터 매 회차 그 이전 데이터만 사용. `computeMeta`가 백테스트형 자체 성적 계산(회차마다 1~10위로 1게임씩).
   - 계산은 웹 워커(`startBT`, 실패 시 `runBacktest`로 대체). 워커는 `runBacktest`의 회차 반복을 복사해 쓰므로 **기준값(`ctx`)을 바꾸면 두 곳 모두** 고친다.
   - 딥러닝은 `dlhist.json`(`DLH`)이 최신 회차까지 있으면 기준값 `c.dlP`로 다른 전략과 똑같이 백테스트, 없으면 예전처럼 `dl.js`의 최근 100회 성적만 표시.
+- 자동 갱신 멈춤 감지: 다음 추첨 다음 날(일) 12:00 KST가 지나도 새 회차가 없으면 `DATA_STALE`이 참 → 맨 위에 '⏳ 반영이 늦어지고 있어요' 안내, selfTest 경고.
 - 토요일 20:00(KST) 판매 마감 뒤 새 회차 반영 전에는 `SALE_CLOSED`가 참 → `NEXT`(대상 회차)·`drawDate`가 한 주 뒤로 넘어감. 다음 회차 번호는 `LAST.no + 1` 대신 `NEXT`를 쓴다.
 - 백테스트 결과는 localStorage(`lottoBT`)에 캐시된다. **전략·제외 규칙·점수 계산을 바꿨으면 `BT_CACHE_VER`를 반드시 1 올려** 지난 캐시를 무효화한다(안 올리면 옛 성적이 그대로 보인다).
 - 외부 파일(`lunar.js`, Pretendard CSS)은 `integrity`(sha384 지문)로 위조를 막는다. **버전을 바꾸면 지문을 새로 계산**해야 한다(`curl -s 주소 | openssl dgst -sha384 -binary | openssl base64 -A`). 틀리면 그 파일이 막혀 사주 기능·글꼴이 꺼진다. 워커의 `importScripts`는 지문을 못 붙여 그대로.

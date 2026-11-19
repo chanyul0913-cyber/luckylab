@@ -50,6 +50,9 @@ $("latest").innerHTML = `<h2>지난 회차 실제 당첨번호 — 제${LAST.no}
   <p class="warn">⚠️ 이미 끝난 추첨의 결과입니다. <b>추천 번호가 아닙니다.</b> 추천 번호는 아래 '번호 뽑기'에서 버튼을 눌러야 나옵니다.</p>
   <div class="balls" style="margin:10px 0">${LAST.n.map(ball).join("")}<span class="plus">+</span>${ball(LAST.b)}</div>
   <p class="note">${!LAST.sales && !LAST.w1 ? "1등 당첨금 집계 중 (발표되면 자동 반영)" : LAST.w1 ? `1등 ${LAST.w1}명 · 1인당 ${won(LAST.a1)}` : "1등 당첨자 없음"} · ${SALE_CLOSED ? `제${LAST.no + 1}회 판매 마감 · ` : ""}다음 추첨은 제${NEXT}회 (${drawDateTxt})</p>`;
+// 자동 갱신이 멈췄을 때 알림: 다음 추첨 다음 날(일요일) 정오(한국 시각)가 지나도 새 회차가 없으면 경고 (03:00 UTC = 12:00 KST)
+const DATA_STALE = Date.now() > Date.UTC(+LAST.ymd.slice(0, 4), +LAST.ymd.slice(4, 6) - 1, +LAST.ymd.slice(6) + 8, 3, 0);
+if (DATA_STALE) $("latest").insertAdjacentHTML("beforeend", `<p class="warn">⏳ 제${LAST.no + 1}회 당첨번호 반영이 늦어지고 있어요. 동행복권 발표를 자동으로 받아 오는 중 문제가 생겼을 수 있습니다. 위 번호는 제${LAST.no}회 결과이며, 통계·추천도 제${LAST.no}회까지 기준입니다.</p>`);
 
 // ---------- 빈도 차트 ----------
 const tip = $("tip");

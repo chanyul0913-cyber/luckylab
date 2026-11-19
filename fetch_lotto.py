@@ -17,8 +17,15 @@ def fetch(epsd):
     req = urllib.request.Request(URL.format(epsd), headers={
         "User-Agent": "Mozilla/5.0", "X-Requested-With": "XMLHttpRequest",
         "Referer": "https://www.dhlottery.co.kr/lt645/result"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return json.load(r)["data"]["list"] or []
+    for attempt in range(3):  # 잠깐의 연결 끊김·서버 지연으로 실행 전체가 실패하지 않게 최대 3번 시도
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return json.load(r)["data"]["list"] or []
+        except (OSError, ValueError) as e:  # 네트워크 오류·이상한 응답(JSON 아님)
+            if attempt == 2:
+                raise
+            print(f"{epsd}회 요청 실패({e}) — {5 * (attempt + 1)}초 뒤 다시 시도")
+            time.sleep(5 * (attempt + 1))
 
 
 rows = {}

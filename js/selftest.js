@@ -33,6 +33,7 @@ window.selfTest = async function selfTest() {
     }
   }
   // 4) 부가 데이터
+  if (DATA_STALE) warnings.push(`데이터: 제${N + 1}회가 아직 반영되지 않음 (자동 갱신 확인 필요)`);
   if (window.LOTTO_DL && LOTTO_DL.last !== N) warnings.push(`딥러닝: dl.js가 ${LOTTO_DL.last}회 기준 (최신 ${N}회, 다음 학습 때 갱신)`);
   if (!RICH) warnings.push("세계 부자: rich.js가 없어 2026 연간 순위로 표시 중");
   if (window.LOTTO_RICH && window.LOTTO_RICH.ver !== undefined && window.LOTTO_RICH.ver !== 1)

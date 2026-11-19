@@ -8,7 +8,8 @@ self.addEventListener("install", e => {
   e.waitUntil(caches.open(VER).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VER).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  // 같은 github.io 주소의 다른 사이트도 저장 공간을 함께 쓰므로, 우리 것(robunso-)의 옛 버전만 지운다
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith("robunso-") && k !== VER).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 // 주소 뒤 ?v=… 는 배포마다 바뀌므로 빼고 파일 하나당 한 칸만 저장 (안 빼면 배포·새로고침마다 저장 공간이 계속 늘어남)
 const save = (key, r) => { if (r.ok) { const c = r.clone(); caches.open(VER).then(c2 => c2.put(key, c)); } return r; }; // 오류 응답(404 등)은 저장 안 함

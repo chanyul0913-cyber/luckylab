@@ -4,6 +4,8 @@
 2) 전체로 다시 학습 -> 다음 회차 확률을 dl.js에 저장
 3) 회차별 기록 dlhist.json: 101회부터 매 회차를, 50회마다 '그때까지의 데이터로만' 다시 학습한 모델로 예측해 둠
    (사이트 백테스트가 딥러닝도 다른 전략과 똑같이 채점하는 데 씀. 새 회차분만 이어서 계산)
+4) 보정(cal): 회차별 기록의 예측 확률을 실제 출현과 비교해, 확률을 13.3%(6/45) 쪽으로 얼마나 당겨야 실제와 맞는지(a) 계산
+모델은 시작값만 다른 ENS개를 학습해 확률을 평균 (한 모델의 우연한 치우침을 줄여 매주 예측이 덜 흔들리게)
 사용: python dl_train.py   (dl.js·dlhist.json이 이미 최신 회차면 건너뜀, --force로 dl.js 강제)
 """
 import csv, json, math, os, sys
@@ -16,7 +18,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "dl.js")
 HIST = os.path.join(HERE, "dlhist.json")
 W, EPOCHS, HOLD, UNITS = 10, 30, 100, 32
-STEP, FROM, HVER = 50, 100, 1  # 50회마다 재학습, 0부터 센 100번째 = 101회(사이트 BT_START), 기록 형식 버전
+STEP, FROM, HVER = 50, 100, 2  # 50회마다 재학습, 0부터 센 100번째 = 101회(사이트 BT_START), 기록 형식 버전(2: 5개 평균)
+ENS = 5  # 평균 낼 모델 수
 
 draws = []
 with open(os.path.join(HERE, "lotto645.csv"), encoding="utf-8-sig") as f:
@@ -60,26 +63,52 @@ class Net(nn.Module):
 
 
 def train(upto):
-    """hot[0:upto]만으로 학습 (upto 이후 회차는 보지 않음)."""
-    torch.manual_seed(upto)  # 같은 데이터면 같은 결과
+    """hot[0:upto]만으로 시작값이 다른 모델 ENS개를 학습 (upto 이후 회차는 보지 않음)."""
+    return [train1(upto, upto * 10 + s) for s in range(ENS)]
+
+
+def train1(upto, seed):
+    torch.manual_seed(seed)  # 같은 데이터·같은 시드면 같은 결과
     X = torch.tensor(np.stack([hot[i - W:i] for i in range(W, upto)]))
     Y = torch.tensor(hot[W:upto])
     m = Net(); opt = torch.optim.Adam(m.parameters(), lr=0.005); lossf = nn.BCEWithLogitsLoss()
-    g = torch.Generator().manual_seed(upto)
+    g = torch.Generator().manual_seed(seed)
     for ep in range(EPOCHS):
         m.train(); tot = 0
         for idx in torch.randperm(len(X), generator=g).split(64):
             opt.zero_grad(); loss = lossf(m(X[idx]), Y[idx]); loss.backward(); opt.step(); tot += loss.item() * len(idx)
         if ep in (0, EPOCHS - 1):
-            print(f"  학습 {upto}회까지 epoch {ep + 1}/{EPOCHS} loss {tot / len(X):.4f}")
+            print(f"  학습 {upto}회까지 #{seed % 10 + 1} epoch {ep + 1}/{EPOCHS} loss {tot / len(X):.4f}")
     m.eval()
     return m
 
 
-def predict(m, end):
-    """hot[end-W:end] -> 회차 end(0-based)의 45개 확률."""
+def predict(ms, end):
+    """hot[end-W:end] -> 회차 end(0-based)의 45개 확률 (모델들의 평균)."""
     with torch.no_grad():
-        return torch.sigmoid(m(torch.tensor(hot[None, end - W:end]))).numpy()[0]
+        x = torch.tensor(hot[None, end - W:end])
+        return np.mean([torch.sigmoid(m(x)).numpy()[0] for m in ms], axis=0)
+
+
+def calibrate(ps):
+    """회차별 기록(천분율)과 실제 당첨번호로 보정값 계산. 보정 확률 = 6/45 + a × (모델 확률 − 6/45).
+    a는 0~1에서 로그손실(예측이 빗나간 정도)이 가장 작은 값. a=0이면 '모델이 아무 정보도 못 줌'."""
+    p0 = 6 / 45
+    P = np.array(ps, dtype=np.float64) / 1000
+    Y = np.zeros_like(P)
+    for j in range(len(ps)):
+        Y[j, [x - 1 for x in draws[FROM + j]]] = 1
+    def ll(a):
+        q = np.clip(p0 + a * (P - p0), 1e-6, 1 - 1e-6)
+        return float(-(Y * np.log(q) + (1 - Y) * np.log(1 - q)).mean())
+    a = min((k / 100 for k in range(101)), key=ll)
+    edges = [0, .10, .12, .14, .16, 1]
+    bins = []
+    for lo, hi in zip(edges, edges[1:]):
+        m = (P >= lo) & (P < hi)
+        if m.sum():
+            bins.append([lo, hi, int(m.sum()), round(float(Y[m].mean()), 4)])
+    return {"a": a, "ll": round(ll(1), 5), "ll0": round(ll(0), 5), "n": len(ps), "bins": bins}
 
 
 def build_hist():
@@ -96,9 +125,11 @@ def build_hist():
     with open(HIST, "w", encoding="utf-8") as f:
         json.dump({"ver": HVER, "step": STEP, "from": FROM + 1, "last": N, "p": ps}, f, separators=(",", ":"))
     print(f"dlhist.json 저장: {FROM + 1}~{N}회 {len(ps)}회분")
+    return ps
 
 
-build_hist()
+cal = calibrate(build_hist())
+print(f"보정: a={cal['a']} (로그손실 모델 {cal['ll']} / 모두 13.3% {cal['ll0']})")
 if dl_fresh:
     print("dl.js는 이미 최신이라 회차별 기록만 갱신"); sys.exit(0)
 
@@ -124,9 +155,9 @@ if os.path.exists(OUT):
     with open(OUT, encoding="utf-8") as f:
         old = json.loads(f.read().split("=", 1)[1].rstrip().rstrip(";"))
     prev = {"no": N, "p": old["p"]} if old["last"] + 1 == N else old.get("prev")
-res = {"last": N, "p": [round(float(v), 5) for v in p], "hit": hit, "n": n, "h3": h3, "h4": h4, "prev": prev,
-       "model": f"LSTM({UNITS}) 창 {W}회, {EPOCHS} epoch, PyTorch {torch.__version__}", "trained": date.today().isoformat()}
+res = {"last": N, "p": [round(float(v), 5) for v in p], "hit": hit, "n": n, "h3": h3, "h4": h4, "prev": prev, "cal": cal,
+       "model": f"LSTM({UNITS}) {ENS}개 평균, 창 {W}회, {EPOCHS} epoch, PyTorch {torch.__version__}", "trained": date.today().isoformat()}
 with open(OUT, "w", encoding="utf-8") as f:
     f.write("window.LOTTO_DL=" + json.dumps(res, ensure_ascii=False, separators=(",", ":")) + ";\n")
-assert len(res["p"]) == 45 and all(0 < v < 1 for v in res["p"])
+assert len(res["p"]) == 45 and all(0 < v < 1 for v in res["p"]) and 0 <= cal["a"] <= 1
 print(f"dl.js 저장: {N + 1}회 예측 상위 6개 {sorted((np.argsort(-p)[:6] + 1).tolist())}")

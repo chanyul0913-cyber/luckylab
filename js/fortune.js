@@ -196,15 +196,28 @@ const qW = quantumWeights(freq, c50, gap, N);
 // ---------- 딥러닝(LSTM) ----------
 // 학습은 GitHub Actions에서 매주 dl_train.py(PyTorch)로 하고, 페이지는 결과(dl.js)만 읽음
 const dl = window.LOTTO_DL && window.LOTTO_DL.last === N ? window.LOTTO_DL : null;
+// 보정 확률: 과거 회차별 예측과 실제 출현을 비교해 구한 a로 13.3% 쪽으로 당긴 값 (dl.cal 없으면 모델 값 그대로)
+const dlCal = v => dl.cal ? 6 / 45 + dl.cal.a * (v - 6 / 45) : v;
+const dlPct = v => dl.cal ? `${(dlCal(v) * 100).toFixed(1)}%<small class="note"> 모델 ${(v * 100).toFixed(1)}%</small>` : `${(v * 100).toFixed(1)}%`;
+function renderCal() { // 모델이 매긴 확률대별로 실제로 나온 비율 — 확률이 믿을 만한지 보여 줌
+  const c = dl.cal; if (!c) return "";
+  return `<h2 style="margin-top:18px;font-size:15px">확률 검증 — 모델이 매긴 확률 vs 실제로 나온 비율</h2>
+    <p class="note">제101회부터 ${c.n}회 동안, 추첨 전에 낸 예측 확률을 구간별로 묶어 실제로 나온 비율과 비교했습니다. 확률이 믿을 만하다면 두 값이 비슷해야 합니다.</p>
+    <table><tr><th>모델이 매긴 확률</th><th>번호 수</th><th>실제로 나온 비율</th></tr>${c.bins.map(([lo, hi, n, r]) =>
+      `<tr><td>${lo ? (lo * 100).toFixed(0) + "%" : ""}${lo && hi < 1 ? " ~ " : lo ? " 이상" : ""}${hi < 1 ? (hi * 100).toFixed(0) + "% 미만" : ""}</td><td>${n.toLocaleString()}</td><td>${(r * 100).toFixed(1)}%</td></tr>`).join("")}</table>
+    <p class="note">보정 결과: ${c.a === 0 ? `<b>모든 번호를 13.3%로 두는 것이 가장 정확</b>했습니다. 모델 확률의 높고 낮음은 실제 결과와 관계가 없다는 뜻입니다.`
+      : `모델 확률과 13.3%의 차이를 <b>${Math.round(c.a * 100)}%만</b> 반영할 때 가장 정확했습니다.`}
+      그래서 위 확률은 보정한 값을 크게, 모델이 낸 원래 값을 작게 표시합니다. (빗나간 정도: 모델 ${c.ll} · 모두 13.3% ${c.ll0}, 작을수록 정확)</p>`;
+}
 function renderDL() {
   const mean = dl.hit / dl.n, z = (mean - 0.8) / Math.sqrt(0.8 * (39 / 45) * (39 / 44) / dl.n);
   const top = NUMS.slice().sort((a, b) => dl.p[b - 1] - dl.p[a - 1]).slice(0, 10);
   $("dlEval").innerHTML = `<h2 style="margin-top:18px;font-size:15px">딥러닝(LSTM) 검증</h2>
     <p class="note">${dl.model}. 최근 100회를 학습에서 빼고, 그 100회를 한 회씩 예측해 5게임씩 맞춰 봤습니다: 평균 일치 <b>${mean.toFixed(3)}</b>
       (무작위 0.800), z = ${z >= 0 ? "+" : ""}${z.toFixed(2)} → <span class="tag ${Math.abs(z) > 1.96 ? "no" : "ok"}">${Math.abs(z) > 1.96 ? "차이 있음" : "무작위와 같음"}</span></p>
-    <p class="note">제${LAST.no + 1}회 예측 확률 상위 10개 (무작위면 모두 13.3%):</p>
-    <div class="balls">${top.map(k => `<span class="mini" style="margin:0 6px 0 0">${ball(k)}<span>${(dl.p[k - 1] * 100).toFixed(1)}%</span></span>`).join("")}</div>`
-    + renderDLPrev();
+    <p class="note">제${LAST.no + 1}회 예측 확률 상위 10개 (무작위면 모두 13.3%${dl.cal ? ", 큰 글씨는 아래 검증으로 보정한 값" : ""}):</p>
+    <div class="balls">${top.map(k => `<span class="mini" style="margin:0 6px 0 0">${ball(k)}<span>${dlPct(dl.p[k - 1])}</span></span>`).join("")}</div>`
+    + renderCal() + renderDLPrev();
 }
 // 지난 회차 예측 vs 실제: 추첨 전에 만든 예측(dl.prev)을 실제 당첨번호와 비교
 function renderDLPrev() {
@@ -215,9 +228,9 @@ function renderDLPrev() {
   const games = [0, 1, 2, 3, 4].map(g => [0, 1, 2, 3, 4, 5].map(j => order[g + j * 5]).filter(k => win.has(k)).length);
   return `<h2 style="margin-top:18px;font-size:15px">지난 회차 예측 vs 실제 — 제${pv.no}회</h2>
     <p class="note">추첨 전에(제${pv.no - 1}회까지 데이터로) 만든 예측입니다. 실제 당첨번호에는 테두리를 표시했습니다.</p>
-    <div class="balls">${order.slice(0, 10).map(k => `<span class="mini" style="margin:0 6px 0 0"><span class="ball ${ballCls(k)}${win.has(k) ? " hitball" : ""}">${k}</span><span>${(pv.p[k - 1] * 100).toFixed(1)}%</span></span>`).join("")}</div>
+    <div class="balls">${order.slice(0, 10).map(k => `<span class="mini" style="margin:0 6px 0 0"><span class="ball ${ballCls(k)}${win.has(k) ? " hitball" : ""}">${k}</span><span>${dlPct(pv.p[k - 1])}</span></span>`).join("")}</div>
     <p class="note">실제 당첨번호: ${d.n.map(ball).join(" ")} + ${ball(d.b)}</p>
-    <p class="note">당첨번호의 예측 순위(45개 중): ${d.n.slice().sort((a, b) => rank(a) - rank(b)).map(k => `<b>${k}</b> ${rank(k)}위(${(pv.p[k - 1] * 100).toFixed(1)}%)`).join(" · ")} · 보너스 ${d.b} ${rank(d.b)}위</p>
+    <p class="note">당첨번호의 예측 순위(45개 중): ${d.n.slice().sort((a, b) => rank(a) - rank(b)).map(k => `<b>${k}</b> ${rank(k)}위(모델 ${(pv.p[k - 1] * 100).toFixed(1)}%)`).join(" · ")} · 보너스 ${d.b} ${rank(d.b)}위</p>
     <p class="note">확률 상위 6개 중 <b>${top6}개</b> 일치 (무작위로 6개 고르면 평균 0.8개) · 백테스트 방식 5게임 일치 수: ${games.join(", ")}개</p>`;
 }
 

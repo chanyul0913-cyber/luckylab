@@ -4,7 +4,7 @@
 // ---------- 백테스트 (각 회차는 직전 회차까지만 사용) ----------
 // 실제 추천과 같은 전략 함수·같은 형태 필터를, 회차마다 그 이전 데이터로 만든 기준값으로 돌림 (미래 데이터 차단)
 const BT_START = 101, BT = {};
-const BT_CACHE_VER = 3;   // 전략·제외 규칙·점수 계산을 바꿀 때 1씩 올린다 (지난 백테스트 캐시 무효화)
+const BT_CACHE_VER = 4;   // 전략·제외 규칙·점수 계산을 바꿀 때 1씩 올린다 (지난 백테스트 캐시 무효화)
 let btFromCache = false;
 function loadBTCache() { // 새 회차·같은 코드면 지난 백테스트 결과를 그대로 씀 (재방문 시 수십 초 절약)
   try {
@@ -20,9 +20,24 @@ function loadBTCache() { // 새 회차·같은 코드면 지난 백테스트 결
 function saveBTCache() { // 기본 전략(+백테스트형)만 저장 — 사주 계열은 사람별이라 매번 계산
   try {
     const stats = {};
-    for (const k of Object.keys(BT)) if (!PROFILE.includes(k) && BT[k] && BT[k].n) stats[k] = { hit: BT[k].hit, h3: BT[k].h3, h4: BT[k].h4, n: BT[k].n, rc: recent50(k) }; // rc: TOP3의 최근 50회 성적
+    for (const k of Object.keys(BT)) if (!PROFILE.includes(k) && BT[k] && BT[k].n) stats[k] = { hit: BT[k].hit, h3: BT[k].h3, h4: BT[k].h4, n: BT[k].n, rd: BT[k].rd, ss: BT[k].ss, rc: recent50(k) }; // rc: TOP3의 최근 50회 성적
     localStorage.setItem("lottoBT", JSON.stringify({ ver: BT_CACHE_VER, last: N, stats }));
   } catch {}
+}
+// 같은 회차의 5게임은 같은 당첨번호로 채점되고 전략이 비슷한 번호를 자주 고르므로 서로 독립이 아님
+// → 회차별 일치 합계의 실제 분산(ss·rd)을 저장해 z를 계산 (독립 가정보다 분산이 최대 35% 커서 z가 부풀던 문제 수정)
+function finishBT(res) {
+  for (const k of Object.keys(res)) {
+    const r = res[k]; if (!r.n) { delete res[k]; continue; } // 한 게임도 못 뽑은 전략은 결과에서 뺌
+    r.rd = 0; r.ss = 0;
+    for (let i = 0; i < r.g.length; i += 5) { if (r.g[i] < 0) continue; let t = 0; for (let g = 0; g < 5; g++) t += Math.max(0, r.g[i + g]); r.rd++; r.ss += t * t; }
+  }
+  return res;
+}
+// z = (회차 평균 합계 − 무작위 기대) / 표준오차. 회차별 기록이 없으면(딥러닝 최근 100회 등) 독립 게임 공식
+function btZ(r) {
+  if (r.rd > 1) { const m = r.hit / r.rd, v = r.ss / r.rd - m * m; if (v > 0) return (m - 0.8 * r.n / r.rd) / Math.sqrt(v / r.rd); }
+  return (r.hit / r.n - 0.8) / Math.sqrt(0.8 * (39 / 45) * (39 / 44) / r.n);
 }
 const drawDay = d => new Date(+d.ymd.slice(0, 4), +d.ymd.slice(4, 6) - 1, +d.ymd.slice(6), 12);
 function runBacktest(keys, done) {
@@ -56,7 +71,7 @@ function runBacktest(keys, done) {
           const fn = STRATS[k][2], R = rng(no * 7919 + hashStr(k)), cx = Object.create(ctx);
           for (let g = 0; g < 5; g++) {
             let s, tries = 0;
-            do s = fn(R, cx, g); while (++tries < 500 && !okShape(s, cx));
+            try { do s = fn(R, cx, g); while (++tries < 500 && !okShape(s, cx)); } catch (e) { continue; } // 오류 난 게임만 건너뜀(계산이 멈추지 않게)
             const h = s.filter(x => win.has(x)).length, r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4; r.g[i * 5 + g] = h;
           }
         }
@@ -68,7 +83,7 @@ function runBacktest(keys, done) {
       if (performance.now() - t0 > (hidden ? 250 : 40)) { i++; break; } // 화면이 멈추지 않게 나눠서 계산
     }
     $("btProg").textContent = i < N ? `계산 중… ${Math.round(i / N * 100)}%` : "";
-    if (i < N) setTimeout(step, 0); else done(res);
+    if (i < N) setTimeout(step, 0); else done(finishBT(res));
   }
   step();
 }
@@ -77,7 +92,7 @@ function runBacktest(keys, done) {
 let btW = null;
 function buildWorkerSource() {
   const consts = { NUMS, GAN, JI, JI_K, GAN_OH, JI_OH, OHS, DIGIT_OH, TEN_SCORE, REL_SCORE, REL_TABLE, OH_GEN, OH_KEUK, CELEB_HAP, SIGNS, DAY_PLANET, BT_START };
-  const fns = [rng, hashStr, pick6, shuffle, okShape, overdueOf, markovWeights, quantumWeights, numOh, dayGZ, drawDay, ohWeights,
+  const fns = [finishBT, rng, hashStr, pick6, shuffle, okShape, overdueOf, markovWeights, quantumWeights, numOh, dayGZ, drawDay, ohWeights,
     sajuWeightsAt, manseAt, signOf, dr, westWeightsAt, shiShen, zaRel, celebScore, celebBlendAt];
   return `
 try { importScripts("https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.js"); } catch (e) {}
@@ -118,7 +133,7 @@ function step() {
         const fn = STRATS[k][2], R = rng(no * 7919 + hashStr(k)), cx = Object.create(ctx);
         for (let g = 0; g < 5; g++) {
           let s, tries = 0;
-          do s = fn(R, cx, g); while (++tries < 500 && !okShape(s, cx));
+          try { do s = fn(R, cx, g); while (++tries < 500 && !okShape(s, cx)); } catch (e) { continue; } // 오류 난 게임만 건너뜀(계산이 멈추지 않게)
           const h = s.filter(x => win.has(x)).length, r = res[k]; r.n++; r.hit += h; r.h3 += h >= 3; r.h4 += h >= 4; r.g[i * 5 + g] = h;
         }
       }
@@ -128,7 +143,7 @@ function step() {
     const sm = d.n.reduce((a, b) => a + b, 0); sumsH.splice(sumsH.findIndex(v => v > sm) >>> 0, 0, sm); past.add(d.n.join(","));
   }
   postMessage({ p: Math.round(i / N * 100) });
-  if (i < N) setTimeout(step, 0); else DONE(res);
+  if (i < N) setTimeout(step, 0); else DONE(finishBT(res));
 }
 onmessage = e => {
   const m = e.data;
@@ -160,13 +175,15 @@ function computeMeta() {
   const keys = Object.keys(BT).filter(k => !["random", "btop"].includes(k) && BT[k] && BT[k].g);
   if (keys.length < 5) return;   // 캐시로 불러온 백테스트형 성적을 지우지 않게 먼저 확인
   delete BT.btop;
-  const cum = Object.fromEntries(keys.map(k => [k, { h3: 0, hit: 0, n: 0 }])), res = { hit: 0, h3: 0, h4: 0, n: 0 };
+  const cum = Object.fromEntries(keys.map(k => [k, { h3: 0, hit: 0, n: 0 }])), res = { hit: 0, h3: 0, h4: 0, n: 0, rd: 0, ss: 0 };
   const rate = k => cum[k].h3 / cum[k].n, mean = k => cum[k].hit / cum[k].n;
   for (let i = 0; i < N; i++) {
     if (D[i].no < BT_START) continue;
     if (keys.every(k => cum[k].n >= 100)) { // 전략마다 100게임(20회) 이상 쌓인 뒤부터
+      const h0 = res.hit; res.rd++;
       keys.slice().sort((a, b) => rate(b) - rate(a) || mean(b) - mean(a)).slice(0, 10).forEach((k, j) => { // 실제 추천과 같게 1~10위로 1게임씩 (전략마다 회차당 5게임을 저장해 둠)
         const h = BT[k].g[i * 5 + j % 5]; res.n++; res.hit += h; res.h3 += h >= 3; res.h4 += h >= 4; });
+      res.ss += (res.hit - h0) ** 2;
     }
     for (const k of keys) for (let g = 0; g < 5; g++) { const h = BT[k].g[i * 5 + g]; if (h < 0) continue; const c = cum[k]; c.n++; c.hit += h; c.h3 += h >= 3; }
   }
@@ -176,7 +193,7 @@ function computeMeta() {
 // 양측 유의수준 0.05를 비교 전략 수로 나눈 기준 z (본페로니)
 const zCrit = m => { let lo = 1.5, hi = 5; for (let t = 0; t < 40; t++) { const mid = (lo + hi) / 2; (1 - Phi(mid)) * 2 * m > 0.05 ? lo = mid : hi = mid; } return hi; };
 function renderBT() {
-  const MU = 0.8, VAR = 0.8 * (39 / 45) * (39 / 44), P3 = [3, 4, 5, 6].reduce((t, k) => t + C(6, k) * C(39, 6 - k), 0) / C(45, 6);
+  const P3 = [3, 4, 5, 6].reduce((t, k) => t + C(6, k) * C(39, 6 - k), 0) / C(45, 6);
   const order = GROUPS.flatMap(g => g[1]).filter(k => k !== "random").concat("random");
   const rows = order.filter(k => BT[k] || (k === "deep" && dl) || PROFILE.includes(k));
   const m = rows.filter(k => k !== "random" && (BT[k] || (k === "deep" && dl))).length, zc = zCrit(Math.max(1, m));
@@ -185,16 +202,16 @@ function renderBT() {
   const zs = z => (z >= 0 ? "+" : "") + z.toFixed(2);
   $("btTxt").innerHTML = `제${BT_START}회~제${LAST.no}회 ${N - BT_START + 1}회를, 매 회차 <b>그 이전 데이터만</b> 보고 각 전략으로 5게임씩 뽑아 실제 결과와 맞춰 봤습니다.
     추천과 똑같은 전략·제외 규칙을 씁니다. 무작위 기준: 게임당 평균 0.800개 일치, 3개 이상 ${(P3 * 100).toFixed(2)}%.
-    전략을 ${m}개 비교하므로 |z| &gt; ${zc.toFixed(2)}여야 유의합니다.`
+    z는 같은 회차 게임끼리 겹치는 영향까지 반영했고, 전략을 ${m}개 비교하므로 |z| &gt; ${zc.toFixed(2)}여야 유의합니다.`
     + (btFromCache ? ` <b>이전에 계산한 결과를 불러왔습니다</b>(새 회차가 나오면 자동 다시 계산)` : "")
     + ` <span id="btRecalc" role="button" style="text-decoration:underline;cursor:pointer;color:var(--ink2)">🔄 다시 계산</span>`;
   $("bt").innerHTML = "<tr><th>전략</th><th>평균 일치</th><th>3개+</th><th>4개+</th><th>z</th><th>판정</th></tr>" + rows.map(k => {
     const name = STRATS[k][0];
-    if (k === "deep" && !BT.deep) { const mean = dl.hit / dl.n, z = (mean - MU) / Math.sqrt(VAR / dl.n), has3 = dl.h3 != null;
+    if (k === "deep" && !BT.deep) { const mean = dl.hit / dl.n, z = btZ(dl), has3 = dl.h3 != null;
       return `<tr><td>${name} <small class="note">최근 100회만</small></td><td>${mean.toFixed(3)}</td><td>${has3 ? (dl.h3 / dl.n * 100).toFixed(2) + "%" : "-"}</td><td>${has3 ? dl.h4 : "-"}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`; }
     const r = BT[k];
     if (!r) return `<tr><td>${name}</td><td colspan="5" class="note" style="text-align:left">${saju ? "계산 중…" : "내 정보 입력 후 계산됩니다"}</td></tr>`;
-    const z = (r.hit / r.n - MU) / Math.sqrt(VAR / r.n);
+    const z = btZ(r);
     const who = PROFILE.includes(k) && saju ? ` <small class="note">${saju.name ? esc(saju.name) + " 기준" : "내 사주 기준"}</small>`
       : k === "deep" ? ` <small class="note">50회마다 다시 학습</small>`
       : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 10개로 1게임씩${r.saju ? ", 사주 계열 포함" : ""}</small>` : "";

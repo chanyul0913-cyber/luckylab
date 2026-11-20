@@ -55,6 +55,8 @@ window.selfTest = async function selfTest() {
     if (!good) warnings.push("유닛: balance로 okShape 통과 조합을 못 만들어 건너뜀"); else if (!okShape(good)) problems.push("유닛: okShape가 옳은 조합을 거름");
     const qw = quantumWeights(freq, c50, gap, N);
     if (!NUMS.every(k => Number.isFinite(qw[k]) && qw[k] >= 0)) problems.push("유닛: quantumWeights에 음수·비정상 값");
+    const fz = finishBT({ a: { hit: 8, n: 10, g: Int8Array.from([1, 1, 1, 1, 1, 0, 1, 0, 2, 0, -1, -1, -1, -1, -1]) }, b: { hit: 0, n: 0, g: new Int8Array(5).fill(-1) } });
+    if (fz.b || fz.a.rd !== 2 || fz.a.ss !== 34 || !Number.isFinite(btZ(fz.a))) problems.push("유닛: finishBT·btZ(회차별 분산 z) 계산 이상");
     const wasFC = btFromCache; saveBTCache(); const okc = loadBTCache(); btFromCache = wasFC;   // 캐시 저장→읽기 왕복(화면 표시는 원래대로)
     if (!okc) problems.push("유닛: 백테스트 캐시 저장→읽기 실패");
   }

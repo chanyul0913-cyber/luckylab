@@ -82,7 +82,7 @@ $("cold").innerHTML = [...NUMS].sort((a, b) => gap(b) - gap(a) || a - b).slice(0
 const tests = [];
 // 이월수: 직전 회차 번호가 다시 나온 개수. 무기억이면 기대 0.8
 let carry = 0; for (let i = 1; i < N; i++) carry += D[i].n.filter(x => D[i - 1].n.includes(x)).length;
-tests.push(["이월수 (직전 회차 번호 재출현)", `평균 ${(carry / (N - 1)).toFixed(3)}개`, "기대 0.800", Math.abs(carry / (N - 1) - 0.8) < 3 * Math.sqrt(0.8 * 0.53 / (N - 1))]);
+tests.push(["이월수 (직전 회차 번호 재출현)", `평균 ${(carry / (N - 1)).toFixed(3)}개`, "기대 0.800", Math.abs(carry / (N - 1) - 0.8) < 3 * Math.sqrt(0.8 * (39 / 45) * (39 / 44) / (N - 1))]);
 // 균등 6개 빠른 뽑기 (부분 Fisher-예이츠): 무작위 시뮬 등 가중치 없는 대량 추출용
 function quick6(R) { const a = NUMS.slice(); for (let i = 0; i < 6; i++) { const j = i + Math.floor(R() * (45 - i)); const t = a[i]; a[i] = a[j]; a[j] = t; } return [a[0], a[1], a[2], a[3], a[4], a[5]].sort((x, y) => x - y); }
 // 쌍 동시출현: 최다 쌍이 무작위 시뮬레이션 범위 안인가

@@ -37,7 +37,15 @@ if os.path.exists(OUT):
 
 epsd = max(rows, default=0) + 1
 while True:
-    got = [d for d in fetch(epsd) if int(d["ltEpsd"]) not in rows]
+    try:
+        got = [d for d in fetch(epsd) if int(d["ltEpsd"]) not in rows]
+    except (OSError, ValueError) as e:
+        # 동행복권 서버가 응답하지 않아도 배포(화면 수정 반영)는 계속되게, 있는 데이터로 마무리.
+        # 오래 이어지면 화면의 '반영이 늦어지고 있어요' 안내(DATA_STALE)가 알려 줌
+        if not rows:
+            raise
+        print(f"::warning::동행복권 서버 응답 없음({e}) — 기존 {max(rows)}회까지 데이터로 진행")
+        break
     if not got:
         break  # 서버가 더 이상 새 회차를 주지 않음 = 최신 회차까지 수집 완료
     for d in got:
@@ -48,7 +56,11 @@ while True:
 
 # 추첨 직후에 받으면 당첨금 발표 전이라 판매액·당첨자 수가 0으로 옴 → 그런 회차는 다시 받아 채움
 for k in [k for k in sorted(rows) if int(rows[k][20]) == 0]:
-    for d in fetch(k):
+    try:
+        ds = fetch(k)
+    except (OSError, ValueError) as e:
+        print(f"::warning::{k}회 당첨금 정보를 못 받음({e}) — 다음 실행 때 다시 시도"); continue
+    for d in ds:
         if int(d["ltEpsd"]) == k and int(d["rlvtEpsdSumNtslAmt"]) > 0:
             rows[k] = [d[c] for c in COLS]
             print(f"{k}회 당첨금 정보 채움")

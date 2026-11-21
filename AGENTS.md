@@ -42,7 +42,7 @@
 
 ## 자동 갱신·배포 (GitHub Actions `update.yml`)
 - 실행: push할 때, 토 21:50·23:30, 일·월 10:00, 매일 09:00(KST), 수동 실행(`force_dl` 체크 시 딥러닝 강제 재학습).
-- 순서: `fetch_lotto.py` → `fetch_rich.py` → (새 회차면) PyTorch 설치 후 `dl_train.py` → 데이터 바뀌면 봇이 커밋·push → `_site/` 만들어 Pages 배포.
+- 순서: `fetch_lotto.py` → `fetch_rich.py` → `dl_train.py --check`(PyTorch 없이 학습 필요 여부 판단: 새 회차·기록 부족·`HVER` 변경·dl.js에 `cal` 없음) → 필요하면 PyTorch 설치 후 `dl_train.py` → 데이터 바뀌면 봇이 커밋·push → `_site/` 만들어 Pages 배포.
 - 배포 때 `index.html`을 자동 치환한다. **이 두 표식을 지우거나 이름을 바꾸면 안 됨**:
   - 내 사이트 파일을 부르는 `src="….js"`, `href="….css"`(data·dl·rich·js/*·style.css) → `?v=실행번호`가 붙음 (브라우저 캐시로 옛 파일이 섞이는 것 방지). 새 js·css 파일을 만들면 `update.yml`의 `cp`와 `sw.js`의 `CORE`에도 넣는다
   - `const APP_VER = "__APP_VER__";` → index.html·style.css·js/·data.js·dl.js 내용의 해시로 바뀌고 `version.json`도 생성(포브스 순위만 바뀐 날은 띠 안 뜸) → 열어 둔 화면에 "🔄 새 버전이 나왔어요" 띠 표시

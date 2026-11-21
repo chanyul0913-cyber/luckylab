@@ -163,7 +163,7 @@ function startBT(keys, done) { // 워커로 백테스트(별도 스레드, 화�
       if (m.p !== undefined) $("btProg").textContent = `계산 중… ${m.p}%`;
       if (m.done) { $("btProg").textContent = ""; btW.onerror = null; window.__btViaWorker = true; done(m.done); }
     };
-    btW.onerror = e => { window.__btWerr = e.message || "오류"; console.warn("백테스트 워커 실패 — 기존 방식으로 계산:", e.message || e); btW = null; fail(); };
+    btW.onerror = e => { window.__btWerr = e.message || "오류"; console.warn("백테스트 워커 실패 — 기존 방식으로 계산:", e.message || e); fail(); };
     btW.postMessage({ cmd: "run", N, keys,
       D: D.map(d => ({ no: d.no, ymd: d.ymd, n: d.n })),
       dlh: keys.includes("deep") ? DLH : null, celeb: celebList(), saju: saju ? { cnt: saju.cnt, west: { sign: saju.west.sign, life: saju.west.life, wday: saju.west.wday } } : null,
@@ -217,7 +217,7 @@ function renderBT() {
       : k === "btop" ? ` <small class="note">회차마다 그때까지의 상위 10개로 1게임씩${r.saju ? ", 사주 계열 포함" : ""}</small>` : "";
     return `<tr><td>${name}${who}</td><td>${(r.hit / r.n).toFixed(3)}</td><td>${(r.h3 / r.n * 100).toFixed(2)}%</td><td>${r.h4}</td><td>${zs(z)}</td><td>${tag(z, k)}</td></tr>`;
   }).join("");
-  const recalc = $("btRecalc"); if (recalc) recalc.onclick = () => { try { localStorage.removeItem("lottoBT"); } catch {} runBaseBT(); };
+  const recalc = $("btRecalc"); if (recalc) recalc.onclick = () => { if (btBusy) return; try { localStorage.removeItem("lottoBT"); } catch {} runBaseBT(); };
   updateFoldSum();
 }
 // 접힌 '검정 · 백테스트' 카드에 결론 한 줄 (펼치지 않아도 결과를 알 수 있게)

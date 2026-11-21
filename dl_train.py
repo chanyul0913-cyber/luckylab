@@ -7,12 +7,10 @@
 4) 보정(cal): 회차별 기록의 예측 확률을 실제 출현과 비교해, 확률을 13.3%(6/45) 쪽으로 얼마나 당겨야 실제와 맞는지(a) 계산
 모델은 시작값만 다른 ENS개를 학습해 확률을 평균 (한 모델의 우연한 치우침을 줄여 매주 예측이 덜 흔들리게)
 사용: python dl_train.py   (dl.js·dlhist.json이 이미 최신 회차면 건너뜀, --force로 dl.js 강제)
+     python dl_train.py --check   (학습이 필요 없으면 0, 필요하면 1로 끝남 — PyTorch 없이 돌아감, 자동 갱신이 씀)
 """
 import csv, json, math, os, sys
 from datetime import date
-import numpy as np
-import torch
-from torch import nn
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "dl.js")
@@ -40,10 +38,18 @@ def load_hist():
 dl_fresh = False
 if "--force" not in sys.argv and os.path.exists(OUT):
     with open(OUT, encoding="utf-8") as f:
-        dl_fresh = json.loads(f.read().split("=", 1)[1].rstrip().rstrip(";"))["last"] == N
+        old0 = json.loads(f.read().split("=", 1)[1].rstrip().rstrip(";"))
+    dl_fresh = old0["last"] == N and "cal" in old0
 hist0 = load_hist()
-if dl_fresh and hist0 and hist0["last"] == N:
+dl_fresh = dl_fresh and hist0 is not None  # 기록 형식(HVER·ENS 등)이 바뀌어 기록을 새로 만들면 dl.js도 같은 모델로 다시 만듦
+if dl_fresh and hist0["last"] == N:
     print(f"dl.js·dlhist.json이 이미 {N}회 기준이라 건너뜀"); sys.exit(0)
+if "--check" in sys.argv:
+    print("딥러닝 학습 필요"); sys.exit(1)
+
+import numpy as np  # 학습할 때만 필요 (--check는 PyTorch 설치 전에 돌아감)
+import torch
+from torch import nn
 
 hot = np.zeros((N, 45), dtype=np.float32)
 for i, ns in enumerate(draws):

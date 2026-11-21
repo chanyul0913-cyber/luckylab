@@ -38,9 +38,9 @@ jobs:
         run: python fetch_lotto.py
       - name: 포브스 실시간 부자 순위 받기 (실패하면 기존 순위 유지)
         run: python fetch_rich.py
-      - name: 딥러닝(LSTM) 학습 (새 회차가 있거나 회차별 기록이 모자랄 때만)
+      - name: 딥러닝(LSTM) 학습 (새 회차가 있거나 회차별 기록이 모자라거나 형식이 바뀌었을 때만)
         run: |
-          if [ "${{ inputs.force_dl }}" != "true" ] && python -c "import csv,json;n=sum(1 for r in csv.reader(open('lotto645.csv',encoding='utf-8-sig')) if r and r[0].isdigit());d=json.loads(open('dl.js',encoding='utf-8').read().split('=',1)[1].rstrip().rstrip(';'));import os;h=json.load(open('dlhist.json',encoding='utf-8')) if os.path.exists('dlhist.json') else {};raise SystemExit(0 if d['last']==n and h.get('last')==n else 1)"; then
+          if [ "${{ inputs.force_dl }}" != "true" ] && python dl_train.py --check; then
             echo "dl.js·dlhist.json이 이미 최신 회차라 학습 생략"
           else
             pip install --quiet numpy torch --index-url https://download.pytorch.org/whl/cpu

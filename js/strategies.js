@@ -244,6 +244,7 @@ function generate() {
   });
   $("copy").disabled = !current.length;
   $("share").disabled = !current.length;
+  saveMine();
   if (choice.some(k => PROFILE.includes(k)) && !saju) $("sjY").focus();
   renderCelebRank();
 }
@@ -287,6 +288,68 @@ async function shareNumbers(toast) {
   setTimeout(() => toast.textContent = "", 2500);
 }
 $("share").onclick = () => shareNumbers($("toast"));
+
+// ---------- 내 번호 당첨 확인 ----------
+// 붙여넣은 문구에서 게임을 읽음: 줄마다 1~45 서로 다른 숫자 6개. 줄 앞 '1.', 괄호 속 전략 이름, '제○회'는 무시하고, 숫자가 6개 미만인 줄(제목·주소)은 건너뜀
+function parseGames(t) {
+  const games = [], bad = [];
+  t.split(/\r?\n/).forEach((line, i) => {
+    const nums = (line.replace(/\(.*?\)/g, " ").replace(/제\s*\d+\s*회/g, " ").replace(/^\s*\d+\s*[.)]\s/, " ").match(/\d+/g) || []).map(Number);
+    if (nums.length < 6) return;
+    if (nums.length > 6 || nums.some(x => x < 1 || x > 45) || new Set(nums).size !== 6) bad.push(i + 1);
+    else games.push(nums.sort((a, b) => a - b));
+  });
+  return { games, bad };
+}
+const prizeRank = (hit, bonus) => hit === 6 ? 1 : hit === 5 && bonus ? 2 : hit === 5 ? 3 : hit === 4 ? 4 : hit === 3 ? 5 : 0;
+// 1인당 당첨금. shortcut: 4·5등은 지금 고정 금액(5만·5천원)으로 표시 — 초기 회차(2004년 이전)는 실제와 다를 수 있음, 필요하면 data.js에 4·5등 금액도 넣기
+const prizeAmt = (d, r) => [0, d.a1, d.a2, d.a3, 50000, 5000][r] || 0;
+function showWinNo() {
+  const d = D[+$("ckNo").value - 1];
+  $("ckWin").innerHTML = d ? `${fmtDate(d.ymd)} 당첨번호 <span class="balls sm" style="display:inline-flex;vertical-align:middle">${d.n.map(ball).join("")}<span class="plus">+</span>${ball(d.b)}</span>` : "";
+}
+function checkWin() {
+  const t = $("ckIn").value, m = t.match(/제\s*(\d+)\s*회/);
+  if (m) $("ckNo").value = m[1];
+  const no = +$("ckNo").value, d = D[no - 1];
+  const err = msg => { $("ckErr").hidden = false; $("ckErr").textContent = msg; };
+  $("ckErr").hidden = true; $("ckSum").innerHTML = $("ckOut").innerHTML = ""; showWinNo();
+  if (!d) return err(no > N ? `제${no}회는 아직 추첨 전이거나 결과가 반영되지 않았어요. 토요일 추첨 뒤 자동 반영되면 확인할 수 있어요 (지금은 제${N}회까지).` : "회차를 1 이상 숫자로 적어 주세요.");
+  const { games, bad } = parseGames(t);
+  if (!games.length) return err(bad.length ? "1~45 사이의 서로 다른 숫자 6개로 된 줄이 없어요. 번호를 확인해 주세요." : "번호를 찾지 못했어요. 한 줄에 1~45 사이 숫자 6개씩 적어 주세요.");
+  if (bad.length) err(`${bad.join(", ")}번째 줄은 1~45 사이의 서로 다른 숫자 6개가 아니라 빼고 확인했어요.`);
+  const win = new Set(d.n); let best = 0, tot = 0;
+  $("ckOut").innerHTML = games.map((g, i) => {
+    const h = g.filter(x => win.has(x)).length, bon = g.includes(d.b), r = prizeRank(h, bon), amt = prizeAmt(d, r);
+    tot += h; if (r && (!best || r < best)) best = r;
+    return `<div class="set"><span class="idx">${i + 1}게임</span><div class="balls sm">${g.map(x => `<span class="ball ${ballCls(x)} ${win.has(x) ? "hitball" : "miss"}">${x}</span>`).join("")}</div>
+      <div class="why">${r ? `<b>${r}등 당첨</b> · ${h}개 일치${r === 2 ? "+보너스" : ""} · 1인당 ${amt ? won(amt) : "금액 집계 중"}` : `낙첨 · ${h}개 일치${bon ? " (보너스 번호 포함 — 보너스는 5개 맞혔을 때만 2등으로 셈)" : ""}`}</div></div>`;
+  }).join("");
+  $("ckSum").innerHTML = `<div class="ckSum"><div><small>제${no}회 결과</small><b>${best ? best + "등 당첨" : "낙첨"}</b></div>
+    <div><small>맞은 번호</small><b>${tot}개</b> / ${games.length}게임</div>
+    <div><small>게임당 평균</small><b>${(tot / games.length).toFixed(1)}개</b><small>무작위 0.8개</small></div></div>`;
+}
+// 뽑은 번호는 이 기기에만 저장(최근 20번). '최근 뽑은 번호 불러오기'를 누를 때마다 하나씩 이전 것으로
+const loadMine = () => { try { return JSON.parse(localStorage.getItem("lottoMine") || "[]"); } catch { return []; } };
+function saveMine() {
+  if (!current.length) return;
+  try { localStorage.setItem("lottoMine", JSON.stringify([{ at: Date.now(), t: shareText() }, ...loadMine()].slice(0, 20))); } catch {}
+  mineIdx = -1;
+}
+let mineIdx = -1;
+$("ckMine").onclick = () => {
+  const L = loadMine();
+  if (!L.length) { $("ckMineNote").textContent = "이 기기에서 뽑은 번호가 아직 없어요. 위 '번호 뽑기'에서 번호를 받으면 자동 저장됩니다."; return; }
+  mineIdx = (mineIdx + 1) % L.length;
+  const e = L[mineIdx], dt = new Date(e.at);
+  $("ckIn").value = e.t;
+  $("ckMineNote").textContent = `${L.length}개 중 ${mineIdx + 1}번째 (${dt.getMonth() + 1}/${dt.getDate()} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}에 뽑음)${L.length > 1 ? " · 다시 누르면 이전 번호" : ""}`;
+  checkWin();
+};
+$("ckGo").onclick = checkWin;
+$("ckNo").value = N; $("ckNo").max = N; showWinNo();
+$("ckNo").oninput = showWinNo;
+$("ckIn").oninput = () => { $("ckErr").hidden = true; };
 
 // 사주 입력 폼
 $("sjH").innerHTML += Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, "0")}시</option>`).join("");

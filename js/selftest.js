@@ -57,6 +57,9 @@ window.selfTest = async function selfTest() {
     if (!NUMS.every(k => Number.isFinite(qw[k]) && qw[k] >= 0)) problems.push("유닛: quantumWeights에 음수·비정상 값");
     const fz = finishBT({ a: { hit: 8, n: 10, g: Int8Array.from([1, 1, 1, 1, 1, 0, 1, 0, 2, 0, -1, -1, -1, -1, -1]) }, b: { hit: 0, n: 0, g: new Int8Array(5).fill(-1) } });
     if (fz.b || fz.a.rd !== 2 || fz.a.ss !== 34 || !Number.isFinite(btZ(fz.a))) problems.push("유닛: finishBT·btZ(회차별 분산 z) 계산 이상");
+    const pg = parseGames("로또 6/45 제1251회 분석 조합\n1. 2 15 20 32 40 43 (유명인사주형)\n2. 45 1 7 15 19 37\n3. 1 2 3 4 5 46\nhttps://x.io/0913/");
+    if (pg.games.length !== 2 || pg.games[1].join() !== "1,7,15,19,37,45" || pg.bad.join() !== "4") problems.push("유닛: parseGames(당첨 확인 번호 읽기) 이상");
+    if ([[6, 0], [5, 1], [5, 0], [4, 1], [3, 0], [2, 1]].map(([h, b]) => prizeRank(h, b)).join() !== "1,2,3,4,5,0") problems.push("유닛: prizeRank(등수 계산) 이상");
     const wasFC = btFromCache; saveBTCache(); const okc = loadBTCache(); btFromCache = wasFC;   // 캐시 저장→읽기 왕복(화면 표시는 원래대로)
     if (!okc) problems.push("유닛: 백테스트 캐시 저장→읽기 실패");
   }

@@ -5,7 +5,7 @@ const $ = id => document.getElementById(id);
 if (!window.LOTTO) { $("meta").textContent = "data.js가 없습니다. fetch_lotto.py를 먼저 실행하세요."; throw new Error("no data"); }
 
 // ---------- 데이터 ----------
-const D = LOTTO.map(r => ({ no: r[0], ymd: r[1], n: r.slice(2, 8), b: r[8], w1: r[9], a1: r[10], sales: r[11] }));
+const D = LOTTO.map(r => ({ no: r[0], ymd: r[1], n: r.slice(2, 8), b: r[8], w1: r[9], a1: r[10], sales: r[11], a2: r[13], a3: r[15] })); // a2·a3: 2·3등 1인당 당첨금(예전 data.js엔 없음)
 const N = D.length, LAST = D[N - 1];
 const NUMS = Array.from({ length: 45 }, (_, i) => i + 1);
 const C = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = r * (n - k + i) / i; return r; };

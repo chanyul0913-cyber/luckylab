@@ -71,8 +71,9 @@ for k in ks:
 print(f"완료: 1~{ks[-1]}회, {len(ks)}건 -> {OUT}")
 
 # 웹 분석소(index.html)용: file://로 열어도 되도록 JSON이 아닌 JS로 저장
-# [회차, 추첨일, 번호1~6, 보너스, 1등 당첨자수, 1등 당첨금, 총판매액(0이면 당첨금 집계 전)]
-data = [[int(rows[k][0]), str(rows[k][1])] + [int(x) for x in rows[k][2:11]] + [int(rows[k][20])] for k in ks]
+# [회차, 추첨일, 번호1~6, 보너스, 1등 당첨자수, 1등 당첨금, 총판매액(0이면 당첨금 집계 전), 2등 당첨자수, 2등 당첨금, 3등 당첨자수, 3등 당첨금]
+# (뒤에 붙여서 기존 칸 위치는 그대로 — 당첨 확인 기능이 2·3등 1인당 금액을 씀)
+data = [[int(rows[k][0]), str(rows[k][1])] + [int(x) for x in rows[k][2:11]] + [int(rows[k][20])] + [int(x) for x in rows[k][11:15]] for k in ks]
 with open(os.path.join(os.path.dirname(OUT), "data.js"), "w", encoding="utf-8") as f:
     f.write("window.LOTTO=" + json.dumps(data, separators=(",", ":")) + ";\n")
 print("data.js 갱신")

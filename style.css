@@ -187,3 +187,10 @@ dialog#pics::backdrop{background:rgba(0,0,0,.55)}
 .oh{display:grid;grid-template-columns:44px 1fr 28px;align-items:center;gap:8px;font-size:13px;margin:3px 0}
 .oh .fill{height:12px;border-radius:0 4px 4px 0;background:var(--bar)}
 .o-목{color:#2e8b57}.o-화{color:#d9453b}.o-토{color:#b8860b}.o-금{color:#7d7d7d}.o-수{color:#2f6fb0}
+/* 당첨 확인 */
+#ckIn{width:100%;box-sizing:border-box;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical}
+.ball.miss{opacity:.3}
+.ckSum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 4px}
+.ckSum div{background:var(--bg);border-radius:10px;padding:10px}
+.ckSum small{display:block;color:var(--muted);font-size:12px}
+.ckSum b{font-size:18px}

@@ -514,4 +514,5 @@ $("restoreMine").onchange = e => {
 };
 
 if (dl) renderDL();
-renderCelebRank(); // 열자마자 이번 주 유명인 운세 순위를 준비
+// 이번 주 유명인 운세 순위는 화면을 먼저 띄운 뒤 남는 시간에 준비 (유명인 52명 사주 계산이 첫 화면을 늦추지 않게)
+if (window.requestIdleCallback) requestIdleCallback(() => renderCelebRank(), { timeout: 2000 }); else setTimeout(renderCelebRank, 300);

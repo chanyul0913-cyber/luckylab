@@ -96,8 +96,11 @@ function celebList() { // CELEBS(유명인·세계 부자 TOP10) 사주의 일�
   if (window.Solar && window.Lunar) {
     const seen = new Set();
     celebData = CELEBS.map(c => { try {
-      const s = calcSaju(toP(c));
-      return { name: c[1].replace(/^\d+\.\s*/, ""), cnt: s.cnt, dmGan: s.pillars[2].gan, dmJi: s.pillars[2].ji };
+      // 태어난 시간 모름 → 정오 기준 년·월·일 3기둥만 (calcSaju와 결과 같음, 추첨일 가중치 등 안 쓰는 계산을 빼 약 2배 빠름)
+      const ec = Solar.fromYmdHms(c[2], c[3], c[4], 12, 0, 0).getLunar().getEightChar();
+      const pil = [ec.getYear(), ec.getMonth(), ec.getDay()].map(s => ({ gan: GAN.indexOf(s[0]), ji: JI.indexOf(s[1]) }));
+      const cnt = Object.fromEntries(OHS.map(o => [o, 0])); pil.forEach(x => { cnt[GAN_OH[x.gan]]++; cnt[JI_OH[x.ji]]++; });
+      return { name: c[1].replace(/^\d+\.\s*/, ""), cnt, dmGan: pil[2].gan, dmJi: pil[2].ji };
     } catch { return null; } }).filter(Boolean)
       .filter(c => { if (seen.has(c.name)) return false; seen.add(c.name); return true; }); // 글로벌과 세계 부자에 겹친 사람(머스크 등) 한 번만
   }

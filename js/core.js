@@ -88,11 +88,15 @@ function quick6(R) { const a = NUMS.slice(); for (let i = 0; i < 6; i++) { const
 // 쌍 동시출현: 최다 쌍이 무작위 시뮬레이션 범위 안인가
 const pair = new Map(); D.forEach(d => { for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) { const key = d.n[i] * 46 + d.n[j]; pair.set(key, (pair.get(key) || 0) + 1); } });
 let pmax = 0, pkey = 0; pair.forEach((v, k) => { if (v > pmax) { pmax = v; pkey = k; } });
-const simMax = []; const R0 = rng(7);
+// 무작위 시뮬레이션은 회차 수가 같으면 결과도 늘 같으므로(고정 시드) 저장해 두고 다시 씀 — 첫 화면 계산 시간 절약
+let simMax = null;
+try { const c = JSON.parse(localStorage.getItem("lottoPairSim") || "null"); if (c && c.n === N && c.v.length === 40) simMax = c.v; } catch {}
+if (!simMax) { simMax = []; const R0 = rng(7);
 for (let s = 0; s < 40; s++) { const m = new Int16Array(46 * 46); let mx = 0;
   for (let i = 0; i < N; i++) { const t = quick6(R0); for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) { const v = ++m[t[a] * 46 + t[b]]; if (v > mx) mx = v; } }
   simMax.push(mx); }
-simMax.sort((a, b) => a - b);
+  simMax.sort((a, b) => a - b);
+  try { localStorage.setItem("lottoPairSim", JSON.stringify({ n: N, v: simMax })); } catch {} }
 tests.push([`쌍 동시출현 (최다 ${Math.floor(pkey / 46)}-${pkey % 46})`, `${pmax}회`, `무작위 최다 ${simMax[1]}~${simMax[38]}회`, pmax >= simMax[1] && pmax <= simMax[38]]);
 // 합계
 const mean = sums.reduce((a, b) => a + b, 0) / N;

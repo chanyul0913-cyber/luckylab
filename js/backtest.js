@@ -166,7 +166,7 @@ function startBT(keys, done) { // 워커로 백테스트(별도 스레드, 화�
     btW.onerror = e => { window.__btWerr = e.message || "오류"; console.warn("백테스트 워커 실패 — 기존 방식으로 계산:", e.message || e); fail(); };
     btW.postMessage({ cmd: "run", N, keys,
       D: D.map(d => ({ no: d.no, ymd: d.ymd, n: d.n })),
-      dlh: keys.includes("deep") ? DLH : null, celeb: celebList(), saju: saju ? { cnt: saju.cnt, west: { sign: saju.west.sign, life: saju.west.life, wday: saju.west.wday } } : null,
+      dlh: keys.includes("deep") ? DLH : null, celeb: keys.includes("celeb") ? celebList() : [], saju: saju ? { cnt: saju.cnt, west: { sign: saju.west.sign, life: saju.west.life, wday: saju.west.wday } } : null,
       strats: keys.map(k => [k, STRATS[k][2].toString()]) });
   } catch { fail(); }
 }

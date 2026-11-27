@@ -70,7 +70,8 @@
 - 백테스트 결과는 localStorage(`lottoBT`)에 캐시된다. **전략·제외 규칙·점수 계산을 바꿨으면 `BT_CACHE_VER`를 반드시 1 올려** 지난 캐시를 무효화한다(안 올리면 옛 성적이 그대로 보인다).
 - 외부 파일(`lunar.js`, Pretendard CSS)은 `integrity`(sha384 지문)로 위조를 막는다. **버전을 바꾸면 지문을 새로 계산**해야 한다(`curl -s 주소 | openssl dgst -sha384 -binary | openssl base64 -A`). 틀리면 그 파일이 막혀 사주 기능·글꼴이 꺼진다. 워커의 `importScripts`는 지문을 못 붙여 그대로.
 - 사주 계산: 외부 라이브러리 `lunar-javascript@1.7.7`(jsdelivr). 시간 30분 보정(서울 경도). 인터넷이 없으면 사주·만세력·유명인사주형만 꺼지고 나머지는 동작해야 함.
-- 저장: 브라우저 localStorage만 사용(`lottoSaju`, `lottoSajuList`, `lottoMine`). 서버로 개인정보를 보내지 않는다.
+- 저장: 브라우저 localStorage만 사용(`lottoSaju`, `lottoSajuList`, `lottoMine`, 계산 저장용 `lottoBT`·`lottoPairSim`).
+- 첫 화면 속도: 열 때 도는 계산은 가볍게. 쌍 동시출현 무작위 시뮬레이션은 회차 수별로 `lottoPairSim`에 저장, 유명인 운세 순위(`renderCelebRank`)는 화면을 띄운 뒤 남는 시간(`requestIdleCallback`)에 계산. 확인은 스크립트별 실행 시간을 재서 한다. 서버로 개인정보를 보내지 않는다.
 - 서비스 워커는 배포된 사이트(https)에서만 등록된다. localhost·file://에서는 꺼져 있으니 개발 시 캐시 걱정 불필요.
 
 ## 디자인 규칙 (2026-11-10 정리, taste-skill에서 필요한 부분만 차용)

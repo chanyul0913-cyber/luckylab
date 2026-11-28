@@ -2,8 +2,10 @@ name: 로또 데이터 갱신 및 배포
 
 on:
   schedule:
-    # 추첨은 토요일 20:35 KST. GitHub 예약 실행은 늦어지거나 빠질 수 있어 여러 번 시도 (이미 반영됐으면 아무것도 안 함)
-    - cron: "50 12 * * 6"   # 토 21:50 KST
+    # 추첨은 토요일 20:35 KST, 동행복권 발표는 보통 20:45~21:00. GitHub 예약 실행은 몇~십몇 분 늦어질 수 있음
+    # 토 20:45~21:50은 10분마다 확인 (새 회차가 없으면 배포 없이 바로 끝냄 — 아래 FAST)
+    - cron: "45,55 11 * * 6"  # 토 20:45·20:55 KST
+    - cron: "*/10 12 * * 6"   # 토 21:00~21:50 KST 10분마다
     - cron: "30 14 * * 6"   # 토 23:30 KST
     - cron: "0 1 * * 0"     # 일 10:00 KST
     - cron: "0 1 * * 1"     # 월 10:00 KST
@@ -29,6 +31,10 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.chk.outputs.go }}
+    env:
+      FAST: ${{ github.event.schedule == '45,55 11 * * 6' || github.event.schedule == '*/10 12 * * 6' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,9 +42,16 @@ jobs:
           python-version: "3.12"
       - name: 동행복권에서 최신 회차 받기
         run: python fetch_lotto.py
+      - name: 토요일 밤 10분 간격 실행은 새 회차가 없으면 여기서 끝냄
+        id: chk
+        run: |
+          if [ "$FAST" = "true" ] && git diff --quiet data.js; then echo "아직 새 회차 없음 — 다음 확인 때 다시"; echo "go=false" >> $GITHUB_OUTPUT
+          else echo "go=true" >> $GITHUB_OUTPUT; fi
       - name: 포브스 실시간 부자 순위 받기 (실패하면 기존 순위 유지)
+        if: steps.chk.outputs.go == 'true'
         run: python fetch_rich.py
       - name: 딥러닝(LSTM) 학습 (새 회차가 있거나 회차별 기록이 모자라거나 형식이 바뀌었을 때만)
+        if: steps.chk.outputs.go == 'true'
         run: |
           if [ "${{ inputs.force_dl }}" != "true" ] && python dl_train.py --check; then
             echo "dl.js·dlhist.json이 이미 최신 회차라 학습 생략"
@@ -47,12 +60,14 @@ jobs:
             python dl_train.py ${{ inputs.force_dl == true && '--force' || '' }}
           fi
       - name: 새 회차가 있으면 저장소에 커밋
+        if: steps.chk.outputs.go == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add lotto645.csv data.js dl.js rich.js dlhist.json
           git diff --cached --quiet || { git commit -m "data: 자동 갱신 (로또 회차·포브스 순위)"; git push; }
       - name: 사이트 파일 모으기
+        if: steps.chk.outputs.go == 'true'
         run: |
           mkdir _site && cp -r index.html style.css js data.js dl.js rich.js sw.js manifest.webmanifest icon-192.png icon-512.png sitemap.xml dlhist.json _site/
           # 브라우저가 예전 데이터 파일을 캐시해 새 페이지와 섞이지 않도록, 배포마다 주소에 버전을 붙임
@@ -66,11 +81,13 @@ jobs:
           echo "{\"v\":\"$V\"}" > _site/version.json
           grep -c "APP_VER = \"$V\"" _site/index.html
       - uses: actions/upload-pages-artifact@v3
+        if: steps.chk.outputs.go == 'true'
         with:
           path: _site
 
   deploy:
     needs: update
+    if: needs.update.outputs.go == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

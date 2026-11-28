@@ -41,7 +41,7 @@
 | `.claude/launch.json` | Claude 미리보기용 로컬 서버 설정 (git 제외) | — |
 
 ## 자동 갱신·배포 (GitHub Actions `update.yml`)
-- 실행: push할 때, 토 21:50·23:30, 일·월 10:00, 매일 09:00(KST), 수동 실행(`force_dl` 체크 시 딥러닝 강제 재학습).
+- 실행: push할 때, 토 20:45~21:50 10분마다(2026-11-28 사용자 요청: 발표되면 바로 반영), 토 23:30, 일·월 10:00, 매일 09:00(KST), 수동 실행(`force_dl` 체크 시 딥러닝 강제 재학습). 토요일 10분 간격 실행(`FAST`)은 `data.js`가 안 바뀌면 `chk` 단계에서 멈추고 배포하지 않는다(빈 배포·커밋 방지). GitHub 예약 실행 자체가 몇~십몇 분 늦을 수 있어 '발표 즉시'는 보장 못 함 — 급하면 수동 실행.
 - 순서: `fetch_lotto.py` → `fetch_rich.py` → `dl_train.py --check`(PyTorch 없이 학습 필요 여부 판단: 새 회차·기록 부족·`HVER` 변경·dl.js에 `cal` 없음) → 필요하면 PyTorch 설치 후 `dl_train.py` → 데이터 바뀌면 봇이 커밋·push → `_site/` 만들어 Pages 배포.
 - 배포 때 `index.html`을 자동 치환한다. **이 두 표식을 지우거나 이름을 바꾸면 안 됨**:
   - 내 사이트 파일을 부르는 `src="….js"`, `href="….css"`(data·dl·rich·js/*·style.css) → `?v=실행번호`가 붙음 (브라우저 캐시로 옛 파일이 섞이는 것 방지). 새 js·css 파일을 만들면 `update.yml`의 `cp`와 `sw.js`의 `CORE`에도 넣는다
